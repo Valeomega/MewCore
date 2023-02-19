@@ -32,6 +32,9 @@
 #include "WorldStateMgr.h"
 #include <boost/dynamic_bitset.hpp>
 #include <numeric>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 MapManager::MapManager()
     : _freeInstanceIds(std::make_unique<InstanceIds>()), _nextInstanceId(0), _scheduledScripts(0)
@@ -47,6 +50,15 @@ void MapManager::Initialize()
     Map::InitStateMachine();
 
     int num_threads(sWorld->getIntConfig(CONFIG_NUMTHREADS));
+#if ELUNA
+    if (num_threads > 1)
+    {
+        // Force 1 thread for Eluna as lua is single threaded. By default thread count is 1
+        // This should allow us not to use mutex locks
+        TC_LOG_ERROR("maps", "Map update threads set to %i, when Eluna only allows 1, changing to 1", num_threads);
+        num_threads = 1;
+    }
+#endif
     // Start mtmaps if needed.
     if (num_threads > 0)
         m_updater.activate(num_threads);
@@ -438,6 +450,9 @@ void MapManager::FreeInstanceId(uint32 instanceId)
     // If freed instance id is lower than the next id available for new instances, use the freed one instead
     _nextInstanceId = std::min(instanceId, _nextInstanceId);
     _freeInstanceIds->set(instanceId, true);
+#ifdef ELUNA
+    sEluna->FreeInstanceId(instanceId);
+#endif
 }
 
 // hack to allow conditions to access what faction owns the map (these worldstates should not be set on these maps)

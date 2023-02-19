@@ -58,6 +58,10 @@
 #include "World.h"
 #include <G3D/Vector3.h>
 #include <sstream>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#include "ElunaEventMgr.h"
+#endif
 
 constexpr float VisibilityDistances[AsUnderlyingType(VisibilityDistanceType::Max)] =
 {
@@ -864,6 +868,9 @@ void MovementInfo::OutDebug()
 }
 
 WorldObject::WorldObject(bool isWorldObject) : Object(), WorldLocation(), LastUsedScriptID(0),
+#ifdef ELUNA
+elunaEvents(NULL),
+#endif
 m_movementInfo(), m_name(), m_isActive(false), m_isFarVisible(false), m_isWorldObject(isWorldObject), m_zoneScript(nullptr),
 m_transport(nullptr), m_zoneId(0), m_areaId(0), m_staticFloorZ(VMAP_INVALID_HEIGHT), m_outdoors(false), m_liquidStatus(LIQUID_MAP_NO_WATER),
 m_currMap(nullptr), m_InstanceId(0), _dbPhase(0), m_notifyflags(0)
@@ -874,6 +881,11 @@ m_currMap(nullptr), m_InstanceId(0), _dbPhase(0), m_notifyflags(0)
 
 WorldObject::~WorldObject()
 {
+#ifdef ELUNA
+    delete elunaEvents;
+    elunaEvents = NULL;
+#endif
+
     // this may happen because there are many !create/delete
     if (IsWorldObject() && m_currMap)
     {
@@ -889,6 +901,9 @@ WorldObject::~WorldObject()
 
 void WorldObject::Update(uint32 diff)
 {
+#ifdef ELUNA
+    elunaEvents->Update(diff);
+#endif
     m_Events.Update(diff);
 }
 
@@ -1792,6 +1807,12 @@ void WorldObject::SetMap(Map* map)
     m_currMap = map;
     m_mapId = map->GetId();
     m_InstanceId = map->GetInstanceId();
+
+#ifdef ELUNA
+    if (!elunaEvents)
+        elunaEvents = new ElunaEventProcessor(&Eluna::GEluna, this);
+#endif
+
     if (IsWorldObject())
         m_currMap->AddWorldObject(this);
 }

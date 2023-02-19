@@ -41,6 +41,9 @@ class Corpse;
 class Creature;
 class CreatureAI;
 class DynamicObject;
+#ifdef ELUNA
+class ElunaEventProcessor;
+#endif
 class GameObject;
 class InstanceScript;
 class Map;
@@ -723,6 +726,10 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         bool IsWorldObject() const;
 
         uint32  LastUsedScriptID;
+
+#ifdef ELUNA
+        ElunaEventProcessor* elunaEvents;
+#endif
 
         // Transports
         TransportBase* GetTransport() const { return m_transport; }

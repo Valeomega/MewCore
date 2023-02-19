@@ -105,3 +105,10 @@ endif()
 if(USE_COREPCH)
   add_cxx_pch(worldserver ${PRIVATE_PCH_HEADER})
 endif()
+
+# Define BUILD_ELUNA if needed
+if(BUILD_ELUNA)
+  add_definitions(-DELUNA -DRETAIL -DTRINITY)
+#  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/contrib/lua_scripts/masterscript.lua DESTINATION ${BIN_DIR}/lua_scripts)
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src/game/LuaEngine/extensions DESTINATION ${BIN_DIR}/lua_scripts)
+endif()

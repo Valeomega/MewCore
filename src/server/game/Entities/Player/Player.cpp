@@ -134,6 +134,9 @@
 #include "WorldStatePackets.h"
 #include <G3D/g3dmath.h>
 #include <sstream>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
 
@@ -4452,6 +4455,9 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
     // recast lost by death auras of any items held in the inventory
     CastAllObtainSpells();
 
+#ifdef ELUNA
+    sEluna->OnResurrect(this);
+#endif
     if (!applySickness)
         return;
 
@@ -11396,6 +11402,12 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto, bool skipRequiredL
         if (ChrSpecialization(artifact->ChrSpecializationID) != GetPrimarySpecialization())
             return EQUIP_ERR_CANT_USE_ITEM;
 
+#ifdef ELUNA
+    InventoryResult eres = sEluna->OnCanUseItem(this, proto->BasicData->ID);
+    if (eres != EQUIP_ERR_OK)
+        return eres;
+#endif
+
     return EQUIP_ERR_OK;
 }
 
@@ -11755,6 +11767,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem2, bag, slot);
+#endif
         return pItem2;
     }
 
@@ -11767,6 +11782,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
     UpdateAverageItemLevelEquipped();
 
+#ifdef ELUNA
+    sEluna->OnEquip(this, pItem, bag, slot);
+#endif
     return pItem;
 }
 
@@ -14694,6 +14712,9 @@ void Player::AddQuestAndCheckCompletion(Quest const* quest, Object* questGiver)
     {
         case TYPEID_UNIT:
             PlayerTalkClass->ClearMenus();
+#ifdef ELUNA
+            sEluna->OnQuestAccept(this, questGiver->ToCreature(), quest);
+#endif
             questGiver->ToCreature()->AI()->OnQuestAccept(this, quest);
             break;
         case TYPEID_ITEM:
@@ -14728,6 +14749,9 @@ void Player::AddQuestAndCheckCompletion(Quest const* quest, Object* questGiver)
         }
         case TYPEID_GAMEOBJECT:
             PlayerTalkClass->ClearMenus();
+#ifdef ELUNA
+            sEluna->OnQuestAccept(this, questGiver->ToGameObject(), quest);
+#endif
             questGiver->ToGameObject()->AI()->OnQuestAccept(this, quest);
             break;
         default:
@@ -16111,6 +16135,9 @@ QuestGiverStatus Player::GetQuestDialogStatus(Object const* questgiver) const
     {
         case TYPEID_GAMEOBJECT:
         {
+#ifdef ELUNA
+            sEluna->GetDialogStatus(this, questgiver->ToGameObject());
+#endif
             if (GameObjectAI* ai = questgiver->ToGameObject()->AI())
                 if (Optional<QuestGiverStatus> questStatus = ai->GetDialogStatus(this))
                     return *questStatus;
@@ -16120,6 +16147,9 @@ QuestGiverStatus Player::GetQuestDialogStatus(Object const* questgiver) const
         }
         case TYPEID_UNIT:
         {
+#ifdef ELUNA
+            sEluna->GetDialogStatus(this, questgiver->ToCreature());
+#endif
             if (CreatureAI* ai = questgiver->ToCreature()->AI())
                 if (Optional<QuestGiverStatus> questStatus = ai->GetDialogStatus(this))
                     return *questStatus;
@@ -26056,6 +26086,9 @@ void Player::StoreLootItem(ObjectGuid lootWorldObjectGuid, uint8 lootSlot, Loot*
         if (loot->loot_type == LOOT_ITEM)
             sLootItemStorage->RemoveStoredLootItemForContainer(lootWorldObjectGuid.GetCounter(), item->itemid, item->count, item->LootListId);
 
+#ifdef ELUNA
+        sEluna->OnLootItem(this, newitem, item->count, this->GetLootGUID());
+#endif
         ApplyItemLootedSpell(newitem, true);
     }
     else
@@ -26457,6 +26490,9 @@ TalentLearnResult Player::LearnTalent(uint32 talentId, int32* spellOnCooldown)
 
     TC_LOG_DEBUG("misc", "Player::LearnTalent: TalentID: {} Spell: {} Group: {}\n", talentId, spellid, GetActiveTalentGroup());
 
+#ifdef ELUNA
+    sEluna->OnLearnTalents(this, talentId, spellid);
+#endif
     return TALENT_LEARN_OK;
 }
 
