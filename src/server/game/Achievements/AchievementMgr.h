@@ -56,7 +56,6 @@ public:
     virtual void CompletedAchievement(AchievementEntry const* entry, Player* referencePlayer) = 0;
     bool HasAchieved(uint32 achievementId) const;
     uint32 GetAchievementPoints() const;
-    std::vector<uint32> GetCompletedAchievementIds() const;
 
 protected:
     bool CanUpdateCriteriaTree(Criteria const* criteria, CriteriaTree const* tree, Player* referencePlayer) const override;
@@ -71,6 +70,7 @@ protected:
 protected:
     std::unordered_map<uint32, CompletedAchievementData> _completedAchievements;
     uint32 _achievementPoints;
+    uint32 _achievementBattlePetPoints;
 };
 
 class TC_GAME_API PlayerAchievementMgr : public AchievementMgr
@@ -84,7 +84,8 @@ public:
     void LoadFromDB(PreparedQueryResult achievementResult, PreparedQueryResult criteriaResult);
     void SaveToDB(CharacterDatabaseTransaction& trans);
 
-    void ResetCriteria(CriteriaFailEvent failEvent, int32 failAsset, bool evenIfCriteriaComplete = false);
+    void ResetCriteria(CriteriaCondition condition, int32 failAsset, bool evenIfCriteriaComplete = false);
+    void ResetCriteriaId(CriteriaTypes type, uint32 id);
 
     void SendAllData(Player const* receiver) const override;
     void SendAchievementInfo(Player* receiver, uint32 achievementId = 0) const;

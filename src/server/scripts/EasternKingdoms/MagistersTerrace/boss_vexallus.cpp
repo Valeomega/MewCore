@@ -83,6 +83,11 @@ class boss_vexallus : public CreatureScript
                 Talk(SAY_KILL);
             }
 
+            void JustDied(Unit* /*killer*/) override
+            {
+                _JustDied();
+            }
+
             void JustEngagedWith(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
@@ -203,8 +208,7 @@ class npc_pure_energy : public CreatureScript
 
             void JustDied(Unit* killer) override
             {
-                if (killer)
-                    killer->CastSpell(killer, SPELL_ENERGY_FEEDBACK, true);
+                killer->CastSpell(killer, SPELL_ENERGY_FEEDBACK, true);
                 me->RemoveAurasDueToSpell(SPELL_PURE_ENERGY_PASSIVE);
             }
         };

@@ -39,6 +39,7 @@
 #include "SpellMgr.h"
 #include "TemporarySummon.h"
 #include "Vehicle.h"
+#include "MiscPackets.h"
 
 /*########
 # npc_air_force_bots
@@ -336,7 +337,7 @@ public:
                 Reset();
         }
 
-        void QuestReward(Player* /*player*/, Quest const* quest, LootItemType /*type*/, uint32 /*opt*/) override
+        void QuestReward(Player* player, Quest const* quest, LootItemType type, uint32 opt) override
         {
             if (quest->GetQuestId() == QUEST_CLUCK)
                 Reset();
@@ -1741,7 +1742,10 @@ class npc_brewfest_reveler : public CreatureScript
 enum TrainingDummy
 {
     NPC_ADVANCED_TARGET_DUMMY                  = 2674,
-    NPC_TARGET_DUMMY                           = 2673
+    NPC_TARGET_DUMMY                           = 2673,
+
+    EVENT_TD_CHECK_COMBAT                      = 1,
+    EVENT_TD_DESPAWN                           = 2
 };
 
 class npc_training_dummy : public CreatureScript
@@ -1749,21 +1753,27 @@ class npc_training_dummy : public CreatureScript
 public:
     npc_training_dummy() : CreatureScript("npc_training_dummy") { }
 
-    struct npc_training_dummyAI : PassiveAI
+    struct npc_training_dummyAI : ScriptedAI
     {
-        npc_training_dummyAI(Creature* creature) : PassiveAI(creature), _combatCheckTimer(500)
+        npc_training_dummyAI(Creature* creature) : ScriptedAI(creature)
         {
-            uint32 const entry = me->GetEntry();
-            if (entry == NPC_TARGET_DUMMY || entry == NPC_ADVANCED_TARGET_DUMMY)
-            {
-                _combatCheckTimer = 0;
-                me->DespawnOrUnsummon(16s);
-            }
+            SetCombatMovement(false);
         }
+
+        EventMap _events;
+        std::unordered_map<ObjectGuid, time_t> _damageTimes;
 
         void Reset() override
         {
+            // TODO: solve this in a different way! setting them as stunned prevents dummies from parrying
+            me->SetControlled(true, UNIT_STATE_STUNNED);//disable rotate
+
+            _events.Reset();
             _damageTimes.clear();
+            if (me->GetEntry() != NPC_ADVANCED_TARGET_DUMMY && me->GetEntry() != NPC_TARGET_DUMMY)
+                _events.ScheduleEvent(EVENT_TD_CHECK_COMBAT, 1000);
+            else
+                _events.ScheduleEvent(EVENT_TD_DESPAWN, 15000);
         }
 
         void EnterEvadeMode(EvadeReason why) override
@@ -1776,48 +1786,62 @@ public:
 
         void DamageTaken(Unit* doneBy, uint32& damage) override
         {
-            if (doneBy)
-                _damageTimes[doneBy->GetGUID()] = GameTime::GetGameTime();
+            AddThreat(doneBy, float(damage));    // just to create threat reference
+            _damageTimes[doneBy->GetGUID()] = GameTime::GetGameTime();
             damage = 0;
         }
 
         void UpdateAI(uint32 diff) override
         {
-            if (!_combatCheckTimer || !me->IsInCombat())
+            if (!me->IsInCombat())
                 return;
 
-            if (diff < _combatCheckTimer)
-            {
-                _combatCheckTimer -= diff;
-                return;
-            }
+            if (!me->HasUnitState(UNIT_STATE_STUNNED))
+                me->SetControlled(true, UNIT_STATE_STUNNED);//disable rotate
 
-            _combatCheckTimer = 500;
+            _events.Update(diff);
 
-            time_t const now = GameTime::GetGameTime();
-            auto const& pveRefs = me->GetCombatManager().GetPvECombatRefs();
-            for (auto itr = _damageTimes.begin(); itr != _damageTimes.end();)
+            if (uint32 eventId = _events.ExecuteEvent())
             {
-                // If unit has not dealt damage to training dummy for 5 seconds, remove him from combat
-                if (itr->second < now - 5)
+                switch (eventId)
                 {
-                    auto it = pveRefs.find(itr->first);
-                    if (it != pveRefs.end())
-                        it->second->EndCombat();
+                    case EVENT_TD_CHECK_COMBAT:
+                    {
+                        time_t const now = GameTime::GetGameTime();
+                        auto const& pveRefs = me->GetCombatManager().GetPvECombatRefs();
+                        for (auto itr = _damageTimes.begin(); itr != _damageTimes.end();)
+                        {
+                            // If unit has not dealt damage to training dummy for 5 seconds, remove him from combat
+                            if (itr->second < now - 5)
+                            {
+                                auto it = pveRefs.find(itr->first);
+                                if (it != pveRefs.end())
+                                    it->second->EndCombat();
 
-                    itr = _damageTimes.erase(itr);
+                                itr = _damageTimes.erase(itr);
+                            }
+                            else
+                                ++itr;
+                        }
+
+
+                        for (auto const& pair : pveRefs)
+                            if (_damageTimes.find(pair.first) == _damageTimes.end())
+                                _damageTimes[pair.first] = now;
+
+                        _events.Repeat(1s);
+                        break;
+                    }
+                    case EVENT_TD_DESPAWN:
+                        me->DespawnOrUnsummon(1);
+                        break;
+                    default:
+                        break;
                 }
-                else
-                    ++itr;
             }
-
-            for (auto const& pair : pveRefs)
-                if (_damageTimes.find(pair.first) == _damageTimes.end())
-                    _damageTimes[pair.first] = now;
         }
 
-        std::unordered_map<ObjectGuid, time_t> _damageTimes;
-        uint32 _combatCheckTimer;
+        void MoveInLineOfSight(Unit* /*who*/) override { }
     };
 
     CreatureAI* GetAI(Creature* creature) const override
@@ -2634,7 +2658,7 @@ public:
 
         void ScheduleTasks()
         {
-            _scheduler
+            events
                 .Schedule(Seconds(1), [this](TaskContext /*context*/)
                 {
                     if (Aura* ownerTired = me->GetOwner()->GetAura(SPELL_TIRED_PLAYER))
@@ -2700,18 +2724,18 @@ public:
                     break;
             }
             player->PlayerTalkClass->SendCloseGossip();
-            return false;
-        }
+            return true;
+            }
 
         void UpdateAI(uint32 diff) override
         {
-            _scheduler.Update(diff);
+            events.Update(diff);
         }
 
         bool IsArgentSquire() const { return me->GetEntry() == NPC_ARGENT_SQUIRE; }
 
     private:
-        TaskScheduler _scheduler;
+        TaskScheduler events;
     };
 
     CreatureAI* GetAI(Creature *creature) const override
@@ -2834,6 +2858,84 @@ public:
     }
 };
 
+// 144152 - Moira Thaurissan
+class npc_moira_thaurissan_bfa : public ScriptedAI
+{
+public:
+    enum
+    {
+        QUEST_FER_THE_ALLIANCE = 51486
+    };
+
+    npc_moira_thaurissan_bfa(Creature* creature) : ScriptedAI(creature) { }
+
+    void QuestAccept(Player* player, Quest const* quest) override
+    {
+        if (quest->GetQuestId() == QUEST_FER_THE_ALLIANCE)
+        {
+            player->TeleportTo(0, -8177.66f, 792.195f, 73.9964f, 0.781548f);
+        }
+    }
+};
+
+enum chromie167032Gossips
+{
+    GOSSIP_MENU_SELECT_CHROMIE_TIME = 25426,
+};
+class npc_chromie_167032 : public CreatureScript
+{
+public:
+    npc_chromie_167032() : CreatureScript("npc_chromie_167032") { }
+
+    struct npc_chromie_167032AI : public ScriptedAI
+    {
+        npc_chromie_167032AI(Creature* creature) : ScriptedAI(creature) { }
+
+        bool GossipHello(Player* player) override
+        {
+            if (me->IsQuestGiver())
+                player->PrepareQuestMenu(me->GetGUID());
+
+            AddGossipItemFor(player, GOSSIP_MENU_SELECT_CHROMIE_TIME, GOSSIP_MENU_OPTION_ID_ANSWER_1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+            AddGossipItemFor(player, GOSSIP_MENU_SELECT_CHROMIE_TIME, GOSSIP_MENU_OPTION_ID_ANSWER_1 + 1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+            AddGossipItemFor(player, GOSSIP_MENU_SELECT_CHROMIE_TIME, GOSSIP_MENU_OPTION_ID_ANSWER_1 + 2, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+            SendGossipMenuFor(player, GOSSIP_MENU_SELECT_CHROMIE_TIME, me->GetGUID());
+
+            return true;
+        }
+
+        void SendChromieTimeMenu(Player* player)
+        {
+            WorldPackets::Misc::ChromieTimeOpenNpc worldpark;
+            worldpark.ObjGUID = me->GetGUID();
+            player->GetSession()->SendPacket(worldpark.Write());
+        }
+
+        bool GossipSelect(Player* player, uint32 /*menuId*/, uint32 gossipListId) override
+        {
+            uint32 const sender = player->PlayerTalkClass->GetGossipOptionSender(gossipListId);
+            uint32 const action = player->PlayerTalkClass->GetGossipOptionAction(gossipListId);
+            ClearGossipMenuFor(player);
+
+            switch (action)
+            {
+            case GOSSIP_ACTION_INFO_DEF + 1:
+            case GOSSIP_ACTION_INFO_DEF + 2:
+                SendChromieTimeMenu(player);
+                break;
+            case GOSSIP_ACTION_INFO_DEF + 3:
+                break;
+            }
+            return true;
+        }
+    };
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_chromie_167032AI(creature);
+    }
+};
+
 void AddSC_npcs_special()
 {
     new npc_air_force_bots();
@@ -2859,4 +2961,6 @@ void AddSC_npcs_special()
     new npc_train_wrecker();
     new npc_argent_squire_gruntling();
     new npc_bountiful_table();
+    RegisterCreatureAI(npc_moira_thaurissan_bfa);
+    new npc_chromie_167032();
 }

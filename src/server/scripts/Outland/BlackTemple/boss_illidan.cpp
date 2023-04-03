@@ -703,7 +703,8 @@ struct boss_illidan_stormrage : public BossAI
 
     void DamageTaken(Unit* who, uint32 &damage) override
     {
-        if (damage >= me->GetHealth() && (!who || who->GetGUID() != me->GetGUID()))
+
+        if (damage >= me->GetHealth() && who->GetGUID() != me->GetGUID())
         {
             damage = me->GetHealth() - 1;
             if (!_dead)
@@ -1379,7 +1380,7 @@ struct npc_parasitic_shadowfiend : public ScriptedAI
         _scheduler.Schedule(Seconds(2), [this](TaskContext /*context*/)
         {
             me->SetReactState(REACT_AGGRESSIVE);
-            DoZoneInCombat();
+            me->SetInCombatWithZone();
         });
     }
 
@@ -1394,7 +1395,7 @@ struct npc_parasitic_shadowfiend : public ScriptedAI
             _scheduler.Schedule(Seconds(2), [this](TaskContext /*context*/)
             {
                 me->SetReactState(REACT_AGGRESSIVE);
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
             });
     }
 
@@ -1497,7 +1498,7 @@ struct npc_flame_of_azzinoth : public ScriptedAI
             {
                 case EVENT_ENGAGE:
                     me->SetReactState(REACT_AGGRESSIVE);
-                    DoZoneInCombat();
+                    me->SetInCombatWithZone();
                     _events.ScheduleEvent(EVENT_FLAME_CHARGE, Seconds(5));
                     break;
                 case EVENT_FLAME_CHARGE:

@@ -163,6 +163,8 @@ struct TC_GAME_API ScriptedAI : public CreatureAI
     // Called when hit by a spell
     void SpellHit(Unit* /*caster*/, SpellInfo const* /*spell*/) override { }
 
+    void ApplyDefaultBossImmuneMask();
+
     // Called when spell hits a target
     void SpellHitTarget(Unit* /*target*/, SpellInfo const* /*spell*/) override { }
 
@@ -273,6 +275,9 @@ struct TC_GAME_API ScriptedAI : public CreatureAI
     // return true for 25 man or 25 man heroic mode
     bool Is25ManRaid() const { return _difficulty == DIFFICULTY_25_N || _difficulty == DIFFICULTY_25_HC; }
 
+    bool IsMythic() const { return me->GetMap()->IsMythic(); }
+    bool IsMythicRaid() const { return _difficulty == DIFFICULTY_MYTHIC_RAID; }
+
     template<class T> inline
     const T& DUNGEON_MODE(const T& normal5, const T& heroic10) const
     {
@@ -324,6 +329,8 @@ struct TC_GAME_API ScriptedAI : public CreatureAI
 
         return heroic25;
     }
+
+    void KillCreditMe(Player* player) { player->KilledMonsterCredit(me->GetEntry()); }
 
     private:
         Difficulty _difficulty;

@@ -90,6 +90,7 @@ class TC_GAME_API AuraApplication
         void ClientUpdate(bool remove = false);
 };
 
+#pragma pack(push, 1)
 // Structure representing database aura primary key fields
 struct AuraKey
 {
@@ -100,9 +101,7 @@ struct AuraKey
 
     bool operator<(AuraKey const& right) const
     {
-        auto comparisonTuple = [](AuraKey const& k) { return std::tie(k.Caster, k.Item, k.SpellId, k.EffectMask); };
-
-        return comparisonTuple(*this) < comparisonTuple(right);
+        return memcmp(this, &right, sizeof(*this)) < 0;
     }
 };
 
@@ -111,6 +110,7 @@ struct AuraLoadEffectInfo
     std::array<int32, MAX_SPELL_EFFECTS> Amounts;
     std::array<int32, MAX_SPELL_EFFECTS> BaseAmounts;
 };
+#pragma pack(pop)
 
 class TC_GAME_API Aura
 {
@@ -165,6 +165,7 @@ class TC_GAME_API Aura
         int32 CalcMaxDuration(Unit* caster) const;
         int32 GetDuration() const { return m_duration; }
         void SetDuration(int32 duration, bool withMods = false);
+        void ModDuration(int32 duration, bool withMods = false) { SetDuration(GetDuration() + duration, withMods); }
         void RefreshDuration(bool withMods = false);
         void RefreshTimers(bool resetPeriodicTimer);
         bool IsExpired() const { return !GetDuration() && !m_dropEvent; }
@@ -182,6 +183,7 @@ class TC_GAME_API Aura
         uint8 GetStackAmount() const { return m_stackAmount; }
         void SetStackAmount(uint8 num);
         bool ModStackAmount(int32 num, AuraRemoveMode removeMode = AURA_REMOVE_BY_DEFAULT, bool resetPeriodicTimer = true);
+
         uint32 CalcMaxStackAmount() const;
         bool IsUsingStacks() const;
 
@@ -221,6 +223,7 @@ class TC_GAME_API Aura
         AuraKey GenerateKey(uint32& recalculateMask) const;
         void SetLoadedState(int32 maxDuration, int32 duration, int32 charges, uint8 stackAmount, uint32 recalculateMask, int32* amount);
 
+        // helpers for aura effects
         bool HasEffect(uint8 effIndex) const { return GetEffect(effIndex) != nullptr; }
         bool HasEffectType(AuraType type) const;
         static bool EffectTypeNeedsSendingAmount(AuraType type);
@@ -238,6 +241,7 @@ class TC_GAME_API Aura
 
         void SetNeedClientUpdateForTargets() const;
         void HandleAuraSpecificMods(AuraApplication const* aurApp, Unit* caster, bool apply, bool onReapply);
+        void HandleAuraSpecificPeriodics(AuraApplication const* aurApp, Unit* caster);
         bool CanBeAppliedOn(Unit* target);
         bool CheckAreaTarget(Unit* target);
         bool CanStackWith(Aura const* existingAura) const;
@@ -268,7 +272,7 @@ class TC_GAME_API Aura
         void CallScriptEffectCalcAmountHandlers(AuraEffect const* aurEff, int32 & amount, bool & canBeRecalculated);
         void CallScriptEffectCalcPeriodicHandlers(AuraEffect const* aurEff, bool & isPeriodic, int32 & amplitude);
         void CallScriptEffectCalcSpellModHandlers(AuraEffect const* aurEff, SpellModifier* & spellMod);
-        void CallScriptEffectCalcCritChanceHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, Unit const* victim, float& critChance);
+        void CallScriptEffectCalcCritChanceHandlers(AuraEffect const* aurEff, AuraApplication const* aurApp, Unit* victim, float& critChance);
         void CallScriptEffectAbsorbHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo & dmgInfo, uint32 & absorbAmount, bool & defaultPrevented);
         void CallScriptEffectAfterAbsorbHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo & dmgInfo, uint32 & absorbAmount);
         void CallScriptEffectManaShieldHandlers(AuraEffect* aurEff, AuraApplication const* aurApp, DamageInfo & dmgInfo, uint32 & absorbAmount, bool & defaultPrevented);

@@ -103,7 +103,7 @@ class boss_broggok : public CreatureScript
                 switch (action)
                 {
                     case ACTION_PREPARE_BROGGOK:
-                        DoZoneInCombat();
+                        me->SetInCombatWithZone();
                         break;
                     case ACTION_ACTIVATE_BROGGOK:
                         me->SetReactState(REACT_AGGRESSIVE);

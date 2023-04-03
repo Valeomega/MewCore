@@ -249,7 +249,7 @@ SpellScript::OnCalcCritChanceHandler::OnCalcCritChanceHandler(SpellOnCalcCritCha
     _onCalcCritChanceHandlerScript = onCalcCritChanceHandlerScript;
 }
 
-void SpellScript::OnCalcCritChanceHandler::Call(SpellScript* spellScript, Unit const* victim, float& critChance) const
+void SpellScript::OnCalcCritChanceHandler::Call(SpellScript* spellScript, Unit* victim, float& critChance) const
 {
     (spellScript->*_onCalcCritChanceHandlerScript)(victim, critChance);
 }
@@ -436,22 +436,6 @@ bool SpellScript::IsInTargetHook() const
     }
     return false;
 }
-
-bool SpellScript::IsInModifiableHook() const
-{
-    // after hit hook executed after damage/healing is already done
-    // modifying it at this point has no effect
-    switch (m_currentScriptState)
-    {
-        case SPELL_SCRIPT_HOOK_EFFECT_LAUNCH_TARGET:
-        case SPELL_SCRIPT_HOOK_EFFECT_HIT_TARGET:
-        case SPELL_SCRIPT_HOOK_BEFORE_HIT:
-        case SPELL_SCRIPT_HOOK_HIT:
-            return true;
-    }
-    return false;
-}
-
 bool SpellScript::IsInHitPhase() const
 {
     return (m_currentScriptState >= HOOK_SPELL_HIT_START && m_currentScriptState < HOOK_SPELL_HIT_END);
@@ -619,7 +603,7 @@ int32 SpellScript::GetHitDamage() const
 
 void SpellScript::SetHitDamage(int32 damage)
 {
-    if (!IsInModifiableHook())
+    if (!IsInTargetHook())
     {
         TC_LOG_ERROR("scripts", "Script: `%s` Spell: `%u`: function SpellScript::SetHitDamage was called, but function has no effect in current hook!", m_scriptName->c_str(), m_scriptSpellId);
         return;
@@ -639,7 +623,7 @@ int32 SpellScript::GetHitHeal() const
 
 void SpellScript::SetHitHeal(int32 heal)
 {
-    if (!IsInModifiableHook())
+    if (!IsInTargetHook())
     {
         TC_LOG_ERROR("scripts", "Script: `%s` Spell: `%u`: function SpellScript::SetHitHeal was called, but function has no effect in current hook!", m_scriptName->c_str(), m_scriptSpellId);
         return;
@@ -765,6 +749,11 @@ SpellValue const* SpellScript::GetSpellValue() const
 }
 
 SpellEffectInfo const* SpellScript::GetEffectInfo(SpellEffIndex effIndex) const
+{
+    return GetSpellInfo()->GetEffect(effIndex);
+}
+
+SpellEffectInfo const* AuraScript::GetEffectInfo(SpellEffIndex effIndex) const
 {
     return GetSpellInfo()->GetEffect(effIndex);
 }
@@ -968,7 +957,7 @@ AuraScript::EffectCalcCritChanceHandler::EffectCalcCritChanceHandler(AuraEffectC
     _effectHandlerScript = effectHandlerScript;
 }
 
-void AuraScript::EffectCalcCritChanceHandler::Call(AuraScript* auraScript, AuraEffect const* aurEff, Unit const* victim, float& critChance) const
+void AuraScript::EffectCalcCritChanceHandler::Call(AuraScript* auraScript, AuraEffect const* aurEff, Unit* victim, float& critChance) const
 {
     (auraScript->*_effectHandlerScript)(aurEff, victim, critChance);
 }
@@ -1334,4 +1323,24 @@ AuraApplication const* AuraScript::GetTargetApplication() const
 Difficulty AuraScript::GetCastDifficulty() const
 {
     return GetAura()->GetCastDifficulty();
+}
+
+void SpellScript::OnSummonHandler::Call(SpellScript* spellScript, Creature* creature)
+{
+    (spellScript->*_onSummonHandlerScript)(creature);
+}
+
+SpellScript::OnSummonHandler::OnSummonHandler(SpellOnSummonFnType OnSummonHandlerScript)
+{
+    _onSummonHandlerScript = OnSummonHandlerScript;
+}
+
+void SpellScript::OnTakePowerHandler::Call(SpellScript* spellScript, SpellPowerCost& powerCost)
+{
+    (spellScript->*_onTakePowerHandlerScript)(powerCost);
+}
+
+SpellScript::OnTakePowerHandler::OnTakePowerHandler(SpellOnTakePowerFnType OnTakePowerHandlerScript)
+{
+    _onTakePowerHandlerScript = OnTakePowerHandlerScript;
 }

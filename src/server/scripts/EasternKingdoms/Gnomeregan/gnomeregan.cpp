@@ -275,10 +275,10 @@ public:
                     switch (uiValue)
                     {
                         case 1:
-                            instance->SetBossState(DATA_BLASTMASTER_EVENT, IN_PROGRESS);
+                            instance->SetData(TYPE_EVENT, IN_PROGRESS);
                             break;
                         case 2:
-                            instance->SetBossState(DATA_BLASTMASTER_EVENT, DONE);
+                            instance->SetData(TYPE_EVENT, DONE);
                             NextStep(5000, false, 22);
                             break;
                     }

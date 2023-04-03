@@ -198,13 +198,13 @@ public:
             }
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* killer) override
         {
             Talk(SAY_DEATH);
             if (Unit* midnight = ObjectAccessor::GetUnit(*me, _midnightGUID))
                 midnight->KillSelf();
 
-            _JustDied();
+            BossAI::JustDied(killer);
         }
 
         void SetGUID(ObjectGuid const& guid, int32 id) override

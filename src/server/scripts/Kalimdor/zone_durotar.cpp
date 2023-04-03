@@ -90,8 +90,12 @@ public:
                 player->KilledMonsterCredit(me->GetEntry(), me->GetGUID());
                 Talk(SAY_SPELL_HIT, caster);
                 me->RemoveAllAuras();
-                if (GameObject* Lumberpile = me->FindNearestGameObject(GO_LUMBERPILE, 20))
-                    me->GetMotionMaster()->MovePoint(1, Lumberpile->GetPositionX()-1, Lumberpile->GetPositionY(), Lumberpile->GetPositionZ());
+                if (GameObject* Lumberpile = me->FindNearestGameObject(GO_LUMBERPILE, 20)) {
+                    me->SetFacingToObject(Lumberpile);
+                    me->SetStandState(UNIT_STAND_STATE_STAND);
+                    me->GetMotionMaster()->MovePoint(1, Lumberpile->GetPositionX() - 1, Lumberpile->GetPositionY(), Lumberpile->GetPositionZ());
+                    me->SetFacingToObject(Lumberpile);
+                }               
             }
         }
 

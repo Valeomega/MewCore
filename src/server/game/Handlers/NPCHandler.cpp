@@ -164,6 +164,9 @@ void WorldSession::HandleGossipHelloOpcode(WorldPackets::NPC::Hello& packet)
         _player->GetReputationMgr().SetVisible(factionTemplateEntry);
 
     GetPlayer()->RemoveAurasWithInterruptFlags(SpellAuraInterruptFlags::Interacting);
+    // remove fake death
+    //if (GetPlayer()->HasUnitState(UNIT_STATE_DIED))
+    //    GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
 
     // Stop the npc if moving
     unit->PauseMovement(sWorld->getIntConfig(CONFIG_CREATURE_STOP_FOR_PLAYER));
@@ -182,11 +185,14 @@ void WorldSession::HandleGossipHelloOpcode(WorldPackets::NPC::Hello& packet)
     }
 
     _player->PlayerTalkClass->ClearMenus();
-    if (!unit->AI()->GossipHello(_player))
+    if (!sScriptMgr->OnGossipHello(_player, unit))
     {
-//        _player->TalkedToCreature(unit->GetEntry(), unit->GetGUID());
-        _player->PrepareGossipMenu(unit, unit->GetCreatureTemplate()->GossipMenuId, true);
-        _player->SendPreparedGossip(unit);
+        if (!unit->AI()->GossipHello(_player))
+        {
+            _player->TalkedToCreature(unit->GetEntry(), unit->GetGUID());
+            _player->PrepareGossipMenu(unit, unit->GetCreatureTemplate()->GossipMenuId, true);
+            _player->SendPreparedGossip(unit);
+        }
     }
 }
 
@@ -242,17 +248,22 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPackets::NPC::GossipSelec
         return;
     }
 
+    uint32 gossipOptionSender = _player->PlayerTalkClass->GetGossipOptionSender(packet.GossipIndex);
+    uint32 gossipOptionAction = _player->PlayerTalkClass->GetGossipOptionAction(packet.GossipIndex);
+
     if (!packet.PromotionCode.empty())
     {
         if (unit)
         {
             if (!unit->AI()->GossipSelectCode(_player, packet.GossipID, packet.GossipIndex, packet.PromotionCode.c_str()))
-                _player->OnGossipSelect(unit, packet.GossipIndex, packet.GossipID);
+                if (!sScriptMgr->OnGossipSelectCode(_player, unit, gossipOptionSender, gossipOptionAction, packet.PromotionCode.c_str()))
+                    _player->OnGossipSelect(unit, packet.GossipIndex, packet.GossipID);
         }
         else
         {
             if (!go->AI()->GossipSelectCode(_player, packet.GossipID, packet.GossipIndex, packet.PromotionCode.c_str()))
-                _player->OnGossipSelect(go, packet.GossipIndex, packet.GossipID);
+                if (!sScriptMgr->OnGossipSelectCode(_player, go, gossipOptionSender, gossipOptionAction, packet.PromotionCode.c_str()))
+                    _player->OnGossipSelect(go, packet.GossipIndex, packet.GossipID);
         }
     }
     else
@@ -260,12 +271,14 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPackets::NPC::GossipSelec
         if (unit)
         {
             if (!unit->AI()->GossipSelect(_player, packet.GossipID, packet.GossipIndex))
-                _player->OnGossipSelect(unit, packet.GossipIndex, packet.GossipID);
+                if (!sScriptMgr->OnGossipSelect(_player, unit, gossipOptionSender, gossipOptionAction))
+                    _player->OnGossipSelect(unit, packet.GossipIndex, packet.GossipID);
         }
         else
         {
             if (!go->AI()->GossipSelect(_player, packet.GossipID, packet.GossipIndex))
-                _player->OnGossipSelect(go, packet.GossipIndex, packet.GossipID);
+                if (!sScriptMgr->OnGossipSelect(_player, go, gossipOptionSender, gossipOptionAction))
+                    _player->OnGossipSelect(go, packet.GossipIndex, packet.GossipID);
         }
     }
 }
@@ -744,4 +757,12 @@ void WorldSession::HandleRepairItemOpcode(WorldPackets::Item::RepairItem& packet
         TC_LOG_DEBUG("network", "ITEM: Repair all items at %s", packet.NpcGUID.ToString().c_str());
         _player->DurabilityRepairAll(true, discountMod, packet.UseGuildBank);
     }
+}
+
+void WorldSession::SendOpenAlliedRaceDetails(ObjectGuid const& guid, uint32 RaceID)
+{
+    WorldPackets::NPC::OpenAlliedRaceDetails packet;
+    packet.Guid = guid;
+    packet.RaceId = RaceID;
+    SendPacket(packet.Write());
 }

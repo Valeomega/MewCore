@@ -353,10 +353,9 @@ namespace VMAP
     {
         for (loadedSpawnMap::iterator i = iLoadedSpawns.begin(); i != iLoadedSpawns.end(); ++i)
         {
-            for (uint32 refCount = 0; refCount < i->second; ++refCount)
+                for (uint32 refCount = 0; refCount < i->second; ++refCount)
                 vm->releaseModelInstance(iTreeValues[i->first].getWorldModel()->GetName());
-
-            iTreeValues[i->first].setUnloaded();
+				iTreeValues[i->first].setUnloaded();
         }
         iLoadedSpawns.clear();
         iLoadedTiles.clear();

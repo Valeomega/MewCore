@@ -117,7 +117,6 @@ GameObject::GameObject() : WorldObject(false), MapObject(),
 
     m_respawnTime = 0;
     m_respawnDelayTime = 300;
-    m_despawnDelay = 0;
     m_lootState = GO_NOT_READY;
     m_spawnedByDefault = true;
     m_usetimes = 0;
@@ -518,14 +517,6 @@ void GameObject::Update(uint32 diff)
         AI()->UpdateAI(diff);
     else if (!AIM_Initialize())
         TC_LOG_ERROR("misc", "Could not initialize GameObjectAI");
-
-    if (m_despawnDelay)
-    {
-        if (m_despawnDelay > diff)
-            m_despawnDelay -= diff;
-        else
-            DespawnOrUnsummon(0ms, m_despawnRespawnTime);
-    }
 
     switch (m_lootState)
     {
@@ -954,25 +945,6 @@ void GameObject::AddUniqueUse(Player* player)
     m_unique_users.insert(player->GetGUID());
 }
 
-void GameObject::DespawnOrUnsummon(Milliseconds const& delay, Seconds const& forceRespawnTime)
-{
-    if (delay > 0ms)
-    {
-        if (!m_despawnDelay || m_despawnDelay > delay.count())
-        {
-            m_despawnDelay = delay.count();
-            m_despawnRespawnTime = forceRespawnTime;
-        }
-    }
-    else
-    {
-        uint32 const respawnDelay = (forceRespawnTime > 0s) ? forceRespawnTime.count() : m_respawnDelayTime;
-        if (m_goData && respawnDelay)
-            SaveRespawnTime(respawnDelay);
-        Delete();
-    }
-}
-
 void GameObject::Delete()
 {
     SetLootState(GO_NOT_READY);
@@ -1209,26 +1181,6 @@ void GameObject::DeleteFromDB()
     stmt->setUInt64(0, m_spawnId);
     trans->Append(stmt);
 
-    stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_LINKED_RESPAWN);
-    stmt->setUInt64(0, m_spawnId);
-    stmt->setUInt32(1, LINKED_RESPAWN_GO_TO_GO);
-    trans->Append(stmt);
-
-    stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_LINKED_RESPAWN);
-    stmt->setUInt64(0, m_spawnId);
-    stmt->setUInt32(1, LINKED_RESPAWN_GO_TO_CREATURE);
-    trans->Append(stmt);
-
-    stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_LINKED_RESPAWN_MASTER);
-    stmt->setUInt64(0, m_spawnId);
-    stmt->setUInt32(1, LINKED_RESPAWN_GO_TO_GO);
-    trans->Append(stmt);
-
-    stmt = WorldDatabase.GetPreparedStatement(WORLD_DEL_LINKED_RESPAWN_MASTER);
-    stmt->setUInt64(0, m_spawnId);
-    stmt->setUInt32(1, LINKED_RESPAWN_CREATURE_TO_GO);
-    trans->Append(stmt);
-
     WorldDatabase.CommitTransaction(trans);
 }
 
@@ -1294,7 +1246,7 @@ Unit* GameObject::GetOwner() const
 
 void GameObject::SaveRespawnTime(uint32 forceDelay, bool savetodb)
 {
-    if (m_goData && (forceDelay || m_respawnTime > GameTime::GetGameTime()) && m_spawnedByDefault)
+    if (m_goData && m_respawnTime > GameTime::GetGameTime() && m_spawnedByDefault)
     {
         if (m_respawnCompatibilityMode)
         {
@@ -1524,6 +1476,11 @@ void GameObject::SwitchDoorOrButton(bool activate, bool alternative /* = false *
         SetGoState(GO_STATE_READY);
 }
 
+uint32 GameObject::GetVignetteId() const
+{
+    return m_goInfo ? m_goInfo->GetVignetteId() : 0;
+}
+
 void GameObject::Use(Unit* user)
 {
     // by default spell caster is user
@@ -1537,6 +1494,10 @@ void GameObject::Use(Unit* user)
             playerUser->Dismount();
 
         playerUser->PlayerTalkClass->ClearMenus();
+
+        if (sScriptMgr->OnGossipHello(playerUser, this))
+            return;
+
         if (AI()->GossipHello(playerUser))
             return;
     }

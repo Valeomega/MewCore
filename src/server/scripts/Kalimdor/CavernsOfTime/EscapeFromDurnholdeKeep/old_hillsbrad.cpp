@@ -441,12 +441,12 @@ public:
         {
             Talk(SAY_TH_RANDOM_KILL);
         }
-        void JustDied(Unit* killer) override
+        void JustDied(Unit* slayer) override
         {
             instance->SetData(TYPE_THRALL_EVENT, FAIL);
 
             // Don't do a yell if he kills self (if player goes too far or at the end).
-            if (killer == me)
+            if (slayer == me)
                 return;
 
             Talk(SAY_TH_RANDOM_DIE);

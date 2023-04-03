@@ -25,9 +25,13 @@
 #include "Duration.h"
 #include "Loot.h"
 #include "MapObject.h"
+#include "TaskScheduler.h"
+#include "WildBattlePet.h"
 
 #include <list>
 
+
+class BattlePetInstance;
 class CreatureAI;
 class CreatureGroup;
 class Group;
@@ -35,6 +39,7 @@ class Quest;
 class Player;
 class SpellInfo;
 class WorldSession;
+class WildBattlePet;
 
 enum MovementGeneratorType : uint8;
 
@@ -152,7 +157,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         CreatureAI* AI() const { return reinterpret_cast<CreatureAI*>(i_AI); }
 
-        SpellSchoolMask GetMeleeDamageSchoolMask(WeaponAttackType /*attackType*/ = BASE_ATTACK) const override { return m_meleeDamageSchoolMask; }
+        SpellSchoolMask GetMeleeDamageSchoolMask() const override { return m_meleeDamageSchoolMask; }
         void SetMeleeDamageSchool(SpellSchools school) { m_meleeDamageSchoolMask = SpellSchoolMask(1 << school); }
 
         bool HasSpell(uint32 spellID) const override;
@@ -209,6 +214,8 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         Group* GetLootRecipientGroup() const;
         bool hasLootRecipient() const { return !m_lootRecipient.IsEmpty() || !m_lootRecipientGroup.IsEmpty(); }
         bool isTappedBy(Player const* player) const;                          // return true if the creature is tapped by the player or a member of his party.
+        std::vector<Player*> GetLootRecipients() const;
+        std::vector<Group*> GetLootRecipientGroups() const;
 
         void SetLootRecipient (Unit* unit, bool withGroup = true);
         void AllLootRemovedFromCorpse();
@@ -248,6 +255,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         void DespawnOrUnsummon(uint32 msTimeToDespawn = 0, Seconds const& forceRespawnTime = Seconds(0));
         void DespawnOrUnsummon(Milliseconds const& time, Seconds const& forceRespawnTime = Seconds(0)) { DespawnOrUnsummon(uint32(time.count()), forceRespawnTime); }
+        void DespawnCreaturesInArea(uint32 entry, float range = 125.0f);
 
         time_t const& GetRespawnTime() const { return m_respawnTime; }
         time_t GetRespawnTimeEx() const;
@@ -260,6 +268,9 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         float GetRespawnRadius() const { return m_respawnradius; }
         void SetRespawnRadius(float dist) { m_respawnradius = dist; }
+
+        ObjectGuid replacementFromGUID;
+        std::shared_ptr<BattlePetInstance> m_battlePetInstance;
 
         void DoImmediateBoundaryCheck() { m_boundaryCheckTime = 0; }
         uint32 GetCombatPulseDelay() const { return m_combatPulseDelay; }
@@ -274,6 +285,8 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         ObjectGuid lootingGroupLowGUID;                     // used to find group which is looting corpse
 
         void SendZoneUnderAttackMessage(Player* attacker);
+
+        void SetInCombatWithZone();
 
         bool hasQuest(uint32 quest_id) const override;
         bool hasInvolvedQuest(uint32 quest_id)  const override;
@@ -333,6 +346,8 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         bool m_isTempWorldObject; //true when possessed
 
+        float GetFollowDistance() const { return m_followDistance; }
+        void SetFollowDistance(float dist) { m_followDistance = dist; }
         // Handling caster facing during spellcast
         void SetTarget(ObjectGuid const& guid) override;
         void MustReacquireTarget() { m_shouldReacquireTarget = true; } // flags the Creature for forced (client displayed) target reacquisition in the next ::Update call
@@ -353,6 +368,19 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         bool IsEscortNPC(bool onlyIfActive = true);
 
         bool CanGiveExperience() const;
+        void ForcedDespawn(uint32 timeMSToDespawn = 0, Seconds const& forceRespawnTimer = Seconds(0));
+
+        WildBattlePet* GetWildBattlePet() { return m_wildBattlePet; }
+
+        //Thordekk
+        uint32 GetVignetteId() const { return m_creatureInfo ? m_creatureInfo->VignetteID : 0; }
+        uint32 GetTrackingQuestID() const { return m_creatureInfo ? m_creatureInfo->TrackingQuestID : 0; }
+        uint32 GetAffixState() const { return GetCreatureTemplate()->AffixState; }
+
+        uint32 disableAffix;
+        bool IsAffixDisabled(uint8 affixe) const { return (disableAffix & (1 << affixe)) != 0; }
+
+        TaskScheduler& GetScheduler() { return _scheduler; }
 
         void AtEnterCombat() override;
         void AtExitCombat() override;
@@ -368,6 +396,7 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         ObjectGuid m_lootRecipient;
         ObjectGuid m_lootRecipientGroup;
+        std::vector<ObjectGuid> m_lootRecipients;
 
         /// Timers
         time_t _pickpocketLootRestore;
@@ -410,8 +439,10 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
         bool IsInvisibleDueToDespawn() const override;
         bool CanAlwaysSee(WorldObject const* obj) const override;
 
+        uint16 m_shipmentContainerID;
+
+        float m_followDistance = 1.0f;
     private:
-        void ForcedDespawn(uint32 timeMSToDespawn = 0, Seconds const& forceRespawnTimer = Seconds(0));
         bool CheckNoGrayAggroConfig(uint32 playerLevel, uint32 creatureLevel) const; // No aggro from gray creatures
 
         // Waypoint path
@@ -432,6 +463,10 @@ class TC_GAME_API Creature : public Unit, public GridObject<Creature>, public Ma
 
         time_t _lastDamagedTime; // Part of Evade mechanics
         CreatureTextRepeatGroup m_textRepeat;
+
+        WildBattlePet* m_wildBattlePet;
+
+        TaskScheduler _scheduler;
 
         // Regenerate health
         bool _regenerateHealth; // Set on creation
@@ -463,5 +498,4 @@ class TC_GAME_API ForcedDespawnDelayEvent : public BasicEvent
         Creature& m_owner;
         Seconds const m_respawnTimer;
 };
-
 #endif

@@ -216,7 +216,7 @@ struct dummy_dragonAI : public ScriptedAI
         if (pointId == POINT_ID_LAND)
         {
             me->GetMotionMaster()->Clear();
-            DoZoneInCombat();
+            me->SetInCombatWithZone();
             if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0, true))
             {
                 AddThreat(target, 1.0f);
@@ -815,12 +815,12 @@ public:
                 me->SummonCreature(NPC_TWILIGHT_WHELP, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
             else
                 me->SummonCreature(NPC_SARTHARION_TWILIGHT_WHELP, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_OR_CORPSE_DESPAWN, 60000);
-            me->KillSelf();
+            me->DealDamage(me, me->GetHealth());
         }
 
         void JustSummoned(Creature* who) override
         {
-            DoZoneInCombat(who);
+            who->SetInCombatWithZone();
         }
 
         void UpdateAI(uint32 diff) override
@@ -981,12 +981,13 @@ public:
     {
         npc_twilight_whelpAI(Creature* creature) : ScriptedAI(creature)
         {
+            Reset();
         }
 
         void Reset() override
         {
             me->RemoveAllAuras();
-            DoZoneInCombat();
+            me->SetInCombatWithZone();
             events.ScheduleEvent(EVENT_FADE_ARMOR, 1000);
         }
 

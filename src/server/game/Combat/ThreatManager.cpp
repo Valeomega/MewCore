@@ -94,8 +94,6 @@ ThreatReference::OnlineState ThreatReference::SelectOnlineState()
         return ONLINE_STATE_OFFLINE;
     if (!FlagsAllowFighting(_owner, _victim) || !FlagsAllowFighting(_victim, _owner))
         return ONLINE_STATE_OFFLINE;
-    if (_owner->IsAIEnabled && !_owner->GetAI()->CanAIAttack(_victim))
-        return ONLINE_STATE_OFFLINE;
     // next, check suppression (immunity to chosen melee attack school)
     if (_victim->IsImmunedToDamage(_owner->GetMeleeDamageSchoolMask()))
         return ONLINE_STATE_SUPPRESSED;
@@ -137,17 +135,16 @@ void ThreatReference::ClearThreat(bool sendRemove)
 
 /*static*/ bool ThreatManager::CanHaveThreatList(Unit const* who)
 {
-    Creature const* cWho = who->ToCreature();
     // only creatures can have threat list
-    if (!cWho)
+    if (who->GetTypeId() != TYPEID_UNIT)
         return false;
 
-    // pets, totems and triggers cannot have threat list
-    if (cWho->IsPet() || cWho->IsTotem() || cWho->IsTrigger())
+    // pets and totems cannot have threat list
+    if (who->IsPet() || who->IsTotem())
         return false;
 
     // summons cannot have a threat list, unless they are controlled by a creature
-    if (cWho->HasUnitTypeMask(UNIT_MASK_MINION | UNIT_MASK_GUARDIAN) && !cWho->GetOwnerGUID().IsCreature())
+    if (who->HasUnitTypeMask(UNIT_MASK_MINION | UNIT_MASK_GUARDIAN) && !who->GetOwnerGUID().IsCreature())
         return false;
 
     return true;
@@ -159,13 +156,6 @@ ThreatManager::ThreatManager(Unit* owner) : _owner(owner), _ownerCanHaveThreatLi
         _singleSchoolModifiers[i] = 1.0f;
 }
 
-ThreatManager::~ThreatManager()
-{
-    ASSERT(_myThreatListEntries.empty(), "ThreatManager::~ThreatManager - %s: we still have %zu things threatening us, one of them is %s.", _owner->GetGUID().ToString().c_str(), _myThreatListEntries.size(), _myThreatListEntries.begin()->first.ToString().c_str());
-    ASSERT(_sortedThreatList.empty(), "ThreatManager::~ThreatManager - %s: we still have %zu things threatening us, one of them is %s.", _owner->GetGUID().ToString().c_str(), _sortedThreatList.size(), (*_sortedThreatList.begin())->GetVictim()->GetGUID().ToString().c_str());
-    ASSERT(_threatenedByMe.empty(), "ThreatManager::~ThreatManager - %s: we are still threatening %zu things, one of them is %s.", _owner->GetGUID().ToString().c_str(), _threatenedByMe.size(), _threatenedByMe.begin()->first.ToString().c_str());
-}
-
 void ThreatManager::Initialize()
 {
     _ownerCanHaveThreatList = ThreatManager::CanHaveThreatList(_owner);
@@ -173,8 +163,6 @@ void ThreatManager::Initialize()
 
 void ThreatManager::Update(uint32 tdiff)
 {
-    if (!CanHaveThreatList() || !IsEngaged())
-        return;
     if (_updateClientTimer <= tdiff)
     {
         _updateClientTimer = CLIENT_THREAT_UPDATE_INTERVAL;
@@ -342,10 +330,8 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
         if (!redirInfo.empty())
         {
             float const origAmount = amount;
-            // intentional iteration by index - there's a nested AddThreat call further down that might cause AI calls which might modify redirect info through spells
-            for (size_t i = 0; i < redirInfo.size(); ++i)
+            for (auto const& pair : redirInfo) // (victim,pct)
             {
-                auto const pair = redirInfo[i]; // (victim,pct)
                 Unit* redirTarget = nullptr;
                 auto it = _myThreatListEntries.find(pair.first); // try to look it up in our threat list first (faster)
                 if (it != _myThreatListEntries.end())
@@ -363,10 +349,6 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
         }
     }
 
-    // ensure we're in combat (threat implies combat!)
-    if (!_owner->GetCombatManager().SetInCombatWith(target)) // if this returns false, we're not actually in combat, and thus cannot have threat!
-        return;                                              // typical causes: bad scripts trying to add threat to GMs, dead targets etc
-
     // ok, now we actually apply threat
     // check if we already have an entry - if we do, just increase threat for that entry and we're done
     auto it = _myThreatListEntries.find(target->GetGUID());
@@ -376,16 +358,20 @@ void ThreatManager::AddThreat(Unit* target, float amount, SpellInfo const* spell
         return;
     }
 
+    // otherwise, ensure we're in combat (threat implies combat!)
+    if (!_owner->GetCombatManager().SetInCombatWith(target)) // if this returns false, we're not actually in combat, and thus cannot have threat!
+        return;                                              // typical causes: bad scripts trying to add threat to GMs, dead targets etc
+
     // ok, we're now in combat - create the threat list reference and push it to the respective managers
     ThreatReference* ref = new ThreatReference(this, target, amount);
     PutThreatListRef(target->GetGUID(), ref);
     target->GetThreatManager().PutThreatenedByMeRef(_owner->GetGUID(), ref);
-    if (!_ownerEngaged)
+    if (!ref->IsOffline() && !_ownerEngaged)
     {
         _ownerEngaged = true;
 
         Creature* cOwner = _owner->ToCreature();
-        ASSERT(cOwner); // if we got here the owner can have a threat list, and must be a creature!
+        assert(cOwner); // if we got here the owner can have a threat list, and must be a creature!
         SaveCreatureHomePositionIfNeed(cOwner);
         if (cOwner->IsAIEnabled)
             cOwner->AI()->JustEngagedWith(target);
@@ -396,7 +382,7 @@ void ThreatManager::ScaleThreat(Unit* target, float factor)
 {
     auto it = _myThreatListEntries.find(target->GetGUID());
     if (it != _myThreatListEntries.end())
-        it->second->ScaleThreat(std::max<float>(factor,0.0f));
+        it->second->ScaleThreat(std::max<float>(factor, 0.0f));
 }
 
 void ThreatManager::MatchUnitThreatToHighestThreat(Unit* target)
@@ -419,7 +405,7 @@ void ThreatManager::MatchUnitThreatToHighestThreat(Unit* target)
 
             if ((++it) != end)
             {
-                a = *it;
+                ThreatReference const* a = *it;
                 if (a->IsOnline() && a->GetThreat() > highest->GetThreat())
                     highest = a;
             }
@@ -526,7 +512,7 @@ ThreatReference const* ThreatManager::ReselectVictim()
         return a->_online < b->_online;
     if (a->_taunted != b->_taunted) // taunt state precedence (TAUNT > NONE > DETAUNT)
         return a->_taunted < b->_taunted;
-    return (a->GetThreat()*aWeight < b->GetThreat());
+    return (a->GetThreat() * aWeight < b->GetThreat());
 }
 
 /*static*/ float ThreatManager::CalculateModifiedThreat(float threat, Unit const* victim, SpellInfo const* spell)
@@ -547,40 +533,40 @@ ThreatReference const* ThreatManager::ReselectVictim()
     SpellSchoolMask const mask = spell ? spell->GetSchoolMask() : SPELL_SCHOOL_MASK_NORMAL;
     switch (mask)
     {
-        case SPELL_SCHOOL_MASK_NORMAL:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_NORMAL];
-            break;
-        case SPELL_SCHOOL_MASK_HOLY:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_HOLY];
-            break;
-        case SPELL_SCHOOL_MASK_FIRE:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_FIRE];
-            break;
-        case SPELL_SCHOOL_MASK_NATURE:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_NATURE];
-            break;
-        case SPELL_SCHOOL_MASK_FROST:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_FROST];
-            break;
-        case SPELL_SCHOOL_MASK_SHADOW:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_SHADOW];
-            break;
-        case SPELL_SCHOOL_MASK_ARCANE:
-            threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_ARCANE];
-            break;
-        default:
+    case SPELL_SCHOOL_MASK_NORMAL:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_NORMAL];
+        break;
+    case SPELL_SCHOOL_MASK_HOLY:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_HOLY];
+        break;
+    case SPELL_SCHOOL_MASK_FIRE:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_FIRE];
+        break;
+    case SPELL_SCHOOL_MASK_NATURE:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_NATURE];
+        break;
+    case SPELL_SCHOOL_MASK_FROST:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_FROST];
+        break;
+    case SPELL_SCHOOL_MASK_SHADOW:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_SHADOW];
+        break;
+    case SPELL_SCHOOL_MASK_ARCANE:
+        threat *= victimMgr._singleSchoolModifiers[SPELL_SCHOOL_ARCANE];
+        break;
+    default:
+    {
+        auto it = victimMgr._multiSchoolModifiers.find(mask);
+        if (it != victimMgr._multiSchoolModifiers.end())
         {
-            auto it = victimMgr._multiSchoolModifiers.find(mask);
-            if (it != victimMgr._multiSchoolModifiers.end())
-            {
-                threat *= it->second;
-                break;
-            }
-            float mod = victim->GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_THREAT, mask);
-            victimMgr._multiSchoolModifiers[mask] = mod;
-            threat *= mod;
+            threat *= it->second;
             break;
         }
+        float mod = victim->GetTotalAuraMultiplierByMiscMask(SPELL_AURA_MOD_THREAT, mask);
+        victimMgr._multiSchoolModifiers[mask] = mod;
+        threat *= mod;
+        break;
+    }
     }
     return threat;
 }
@@ -614,11 +600,8 @@ void ThreatManager::ForwardThreatForAssistingMe(Unit* assistant, float baseAmoun
 {
     if (spell && spell->HasAttribute(SPELL_ATTR1_NO_THREAT)) // shortcut, none of the calls would do anything
         return;
-    if (_threatenedByMe.empty())
-        return;
-    float const perTarget = baseAmount / _threatenedByMe.size(); // Threat is divided evenly among all targets (LibThreat sourced)
     for (auto const& pair : _threatenedByMe)
-        pair.second->GetOwner()->GetThreatManager().AddThreat(assistant, perTarget, spell, ignoreModifiers);
+        pair.second->GetOwner()->GetThreatManager().AddThreat(assistant, baseAmount, spell, ignoreModifiers);
 }
 
 void ThreatManager::RemoveMeFromThreatLists()
@@ -705,7 +688,7 @@ void ThreatManager::SendNewVictimToClients(ThreatReference const* victimRef) con
 void ThreatManager::PutThreatListRef(ObjectGuid const& guid, ThreatReference* ref)
 {
     auto& inMap = _myThreatListEntries[guid];
-    ASSERT(!inMap, "Duplicate threat reference at %p being inserted on %s for %s - memory leak!", ref, _owner->GetGUID().ToString().c_str(), guid.ToString().c_str());
+    ASSERT(!inMap && "Duplicate threat list entry being inserted - memory leak!");
     inMap = ref;
     ref->_handle = _sortedThreatList.push(ref);
 }
@@ -729,7 +712,7 @@ void ThreatManager::PurgeThreatListRef(ObjectGuid const& guid, bool sendRemove)
 void ThreatManager::PutThreatenedByMeRef(ObjectGuid const& guid, ThreatReference* ref)
 {
     auto& inMap = _threatenedByMe[guid];
-    ASSERT(!inMap, "Duplicate threatened-by-me reference at %p being inserted on %s for %s - memory leak!", ref, _owner->GetGUID().ToString().c_str(), guid.ToString().c_str());
+    ASSERT(!inMap && "Duplicate entry being inserted into threatened by me list - potential memory leak!");
     inMap = ref;
 }
 

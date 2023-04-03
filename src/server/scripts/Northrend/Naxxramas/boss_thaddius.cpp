@@ -1224,12 +1224,12 @@ class spell_thaddius_magnetic_pull : public SpellScriptLoader
         }
 };
 
-class at_thaddius_entrance : public OnlyOnceAreaTriggerScript
+class at_thaddius_entrance : public AreaTriggerScript
 {
     public:
-        at_thaddius_entrance() : OnlyOnceAreaTriggerScript("at_thaddius_entrance") { }
+        at_thaddius_entrance() : AreaTriggerScript("at_thaddius_entrance") { }
 
-        bool _OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
         {
             InstanceScript* instance = player->GetInstanceScript();
             if (!instance || instance->GetBossState(BOSS_THADDIUS) == DONE)

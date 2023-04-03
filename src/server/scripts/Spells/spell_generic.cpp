@@ -493,7 +493,7 @@ class spell_gen_blood_reserve : public AuraScript
 
         Unit* caster = eventInfo.GetActionTarget();
         CastSpellExtraArgs args(aurEff);
-        args.AddSpellBP0(aurEff->GetAmount());
+        args.SpellValueOverrides.AddBP0(aurEff->GetAmount());
         caster->CastSpell(caster, SPELL_GEN_BLOOD_RESERVE_HEAL, args);
         caster->RemoveAura(SPELL_GEN_BLOOD_RESERVE_AURA);
     }
@@ -782,7 +782,7 @@ class spell_gen_chaos_blast : public SpellScript
         if (Unit* target = GetHitUnit())
         {
             CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
-            args.AddSpellBP0(basepoints0);
+            args.SpellValueOverrides.AddBP0(basepoints0);
             caster->CastSpell(target, SPELL_CHAOS_BLAST, args);
         }
     }
@@ -1043,8 +1043,8 @@ class spell_gen_creature_permanent_feign_death : public AuraScript
         target->AddDynamicFlag(UNIT_DYNFLAG_DEAD);
         target->AddUnitFlag2(UNIT_FLAG2_FEIGN_DEATH);
 
-        if (Creature* creature = target->ToCreature())
-            creature->SetReactState(REACT_PASSIVE);
+        if (target->GetTypeId() == TYPEID_UNIT)
+            target->ToCreature()->SetReactState(REACT_PASSIVE);
     }
 
     void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
@@ -1052,9 +1052,6 @@ class spell_gen_creature_permanent_feign_death : public AuraScript
         Unit* target = GetTarget();
         target->RemoveDynamicFlag(UNIT_DYNFLAG_DEAD);
         target->RemoveUnitFlag2(UNIT_FLAG2_FEIGN_DEATH);
-
-        if (Creature* creature = target->ToCreature())
-            creature->InitializeReactState();
     }
 
     void Register() override
@@ -1140,118 +1137,6 @@ class spell_gen_dalaran_disguise : public SpellScriptLoader
         SpellScript* GetSpellScript() const override
         {
             return new spell_gen_dalaran_disguise_SpellScript();
-        }
-};
-
-class spell_gen_decay_over_time : public SpellScriptLoader
-{
-    public:
-        spell_gen_decay_over_time(char const* name) : SpellScriptLoader(name) { }
-
-        SpellScript* GetSpellScript() const override
-        {
-            return new spell_gen_decay_over_time_SpellScript();
-        }
-
-    private:
-        class spell_gen_decay_over_time_SpellScript : public SpellScript
-        {
-            PrepareSpellScript(spell_gen_decay_over_time_SpellScript);
-
-            void ModAuraStack()
-            {
-                if (Aura* aur = GetHitAura())
-                    aur->SetStackAmount(static_cast<uint8>(GetSpellInfo()->StackAmount));
-            }
-
-            void Register() override
-            {
-                AfterHit += SpellHitFn(spell_gen_decay_over_time_SpellScript::ModAuraStack);
-            }
-        };
-
-    protected:
-        class spell_gen_decay_over_time_AuraScript : public AuraScript
-        {
-            protected:
-                PrepareAuraScript(spell_gen_decay_over_time_AuraScript);
-
-                bool CheckProc(ProcEventInfo& eventInfo)
-                {
-                    return (eventInfo.GetSpellInfo() == GetSpellInfo());
-                }
-
-                void Decay(ProcEventInfo& /*eventInfo*/)
-                {
-                    PreventDefaultAction();
-                    ModStackAmount(-1);
-                }
-
-                void Register() override
-                {
-                    DoCheckProc += AuraCheckProcFn(spell_gen_decay_over_time_AuraScript::CheckProc);
-                    OnProc += AuraProcFn(spell_gen_decay_over_time_AuraScript::Decay);
-                }
-
-                ~spell_gen_decay_over_time_AuraScript() = default;
-        };
-
-        ~spell_gen_decay_over_time() = default;
-};
-
-enum FungalDecay
-{
-    // found in sniffs, there is no duration entry we can possibly use
-    AURA_DURATION = 12600
-};
-
-// 32065 - Fungal Decay
-class spell_gen_decay_over_time_fungal_decay : public spell_gen_decay_over_time
-{
-    public:
-        spell_gen_decay_over_time_fungal_decay() : spell_gen_decay_over_time("spell_gen_decay_over_time_fungal_decay") { }
-
-        class spell_gen_decay_over_time_fungal_decay_AuraScript : public spell_gen_decay_over_time_AuraScript
-        {
-            PrepareAuraScript(spell_gen_decay_over_time_fungal_decay_AuraScript);
-
-            void ModDuration(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
-            {
-                // only on actual reapply, not on stack decay
-                if (GetDuration() == GetMaxDuration())
-                {
-                    SetMaxDuration(AURA_DURATION);
-                    SetDuration(AURA_DURATION);
-                }
-            }
-
-            void Register() override
-            {
-                spell_gen_decay_over_time_AuraScript::Register();
-                OnEffectApply += AuraEffectApplyFn(spell_gen_decay_over_time_fungal_decay_AuraScript::ModDuration, EFFECT_0, SPELL_AURA_MOD_DECREASE_SPEED, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
-            }
-        };
-
-        AuraScript* GetAuraScript() const override
-        {
-            return new spell_gen_decay_over_time_fungal_decay_AuraScript();
-        }
-};
-
-// 36659 - Tail Sting
-class spell_gen_decay_over_time_tail_sting : public spell_gen_decay_over_time
-{
-    public:
-        spell_gen_decay_over_time_tail_sting() : spell_gen_decay_over_time("spell_gen_decay_over_time_tail_sting") { }
-
-        class spell_gen_decay_over_time_tail_sting_AuraScript : public spell_gen_decay_over_time_AuraScript
-        {
-            PrepareAuraScript(spell_gen_decay_over_time_tail_sting_AuraScript);
-        };
-
-        AuraScript* GetAuraScript() const override
-        {
-            return new spell_gen_decay_over_time_tail_sting_AuraScript();
         }
 };
 
@@ -1954,7 +1839,7 @@ class spell_gen_negative_energy_periodic : public AuraScript
         PreventDefaultAction();
 
         CastSpellExtraArgs args(aurEff);
-        args.AddSpellMod(SPELLVALUE_MAX_TARGETS, aurEff->GetTickNumber() / 10 + 1);
+        args.SpellValueOverrides.AddMod(SPELLVALUE_MAX_TARGETS, aurEff->GetTickNumber() / 10 + 1);
         GetTarget()->CastSpell(nullptr, GetSpellInfo()->GetEffect(aurEff->GetEffIndex())->TriggerSpell, args);
     }
 
@@ -3233,7 +3118,7 @@ class spell_gen_vampiric_touch : public AuraScript
 
         Unit* caster = eventInfo.GetActor();
         CastSpellExtraArgs args(aurEff);
-        args.AddSpellBP0(damageInfo->GetDamage() / 2);
+        args.SpellValueOverrides.AddBP0(damageInfo->GetDamage() / 2);
         caster->CastSpell(caster, SPELL_VAMPIRIC_TOUCH_HEAL, args);
     }
 
@@ -4010,6 +3895,126 @@ class spell_gen_impatient_mind : public AuraScript
     }
 };
 
+//312916
+class spell_class_mecagnomo_emergency : public SpellScriptLoader
+{
+public:
+    spell_class_mecagnomo_emergency() : SpellScriptLoader("spell_class_mecagnomo_emergency") { }
+
+    class spell_class_mecagnomo_emergency_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_class_mecagnomo_emergency_AuraScript);
+
+
+        void HandleProc(AuraEffect* aurEff, ProcEventInfo& eventInfo)
+        {
+            PreventDefaultAction();
+            Unit* caster = GetCaster();
+
+            uint32 triggerOnHealth = caster->CountPctFromMaxHealth(aurEff->GetAmount());
+            uint32 currentHealth = caster->GetHealth();
+            // Just falling below threshold
+            if (currentHealth > triggerOnHealth && (currentHealth - caster->GetMaxHealth() * 25.0f / 100.0f) <= triggerOnHealth) {
+                caster->CastSpell(caster, 313010);
+            }
+
+
+        }
+
+
+        bool CheckProc(ProcEventInfo& eventInfo)
+        {
+            Unit* caster = GetCaster();
+            caster->ModifyAuraState(AURA_STATE_WOUNDED_20_PERCENT, false);
+            return true;
+
+        }
+
+
+        void Register() override
+        {
+            DoCheckProc += AuraCheckProcFn(spell_class_mecagnomo_emergency_AuraScript::CheckProc);
+            OnEffectProc += AuraEffectProcFn(spell_class_mecagnomo_emergency_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_PROC_TRIGGER_SPELL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_class_mecagnomo_emergency_AuraScript();
+    }
+};
+
+// 313015
+class spell_class_mecagnomo_emergency2 : public SpellScriptLoader
+{
+public:
+    spell_class_mecagnomo_emergency2() : SpellScriptLoader("spell_class_mecagnomo_emergency2") { }
+
+    class spell_class_mecagnomo_emergency2_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_class_mecagnomo_emergency2_AuraScript);
+
+
+        void HandleHit(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+        {
+            if (!GetCaster()->HasAura(313010))
+                PreventDefaultAction();
+        }
+
+        void Register() override
+        {
+            OnEffectApply += AuraEffectApplyFn(spell_class_mecagnomo_emergency2_AuraScript::HandleHit, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_class_mecagnomo_emergency2_AuraScript();
+    }
+};
+// 313010
+
+class spell_class_mecagnomo_emergency3 : public SpellScriptLoader
+{
+public:
+    spell_class_mecagnomo_emergency3() : SpellScriptLoader("spell_class_mecagnomo_emergency3") { }
+
+    class spell_class_mecagnomo_emergency3_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_class_mecagnomo_emergency3_SpellScript);
+
+        void HandleHit(SpellEffIndex effIndex)
+        {
+            if (!GetCaster()->HasAura(313015))
+                PreventHitDefaultEffect(effIndex);
+        }
+
+        void HandleHeal(SpellEffIndex effIndex)
+        {
+
+            Unit* caster = GetCaster();
+            uint32 heal = caster->GetMaxHealth() * 25.0f / 100.0f;
+            //caster->SpellHealingBonusDone(caster, GetSpellInfo(), caster->CountPctFromMaxHealth(GetSpellInfo()->GetEffect(effIndex)->BasePoints), HEAL, GetEffectInfo());
+            heal = caster->SpellHealingBonusTaken(caster, GetSpellInfo(), heal, HEAL, GetEffectInfo());
+            SetHitHeal(heal);
+            caster->CastSpell(caster, 313015, true);
+
+            PreventHitDefaultEffect(effIndex);
+        }
+
+        void Register()
+        {
+            OnEffectHitTarget += SpellEffectFn(spell_class_mecagnomo_emergency3_SpellScript::HandleHeal, EFFECT_0, SPELL_EFFECT_HEAL_PCT);
+            OnEffectLaunch += SpellEffectFn(spell_class_mecagnomo_emergency3_SpellScript::HandleHit, EFFECT_1, SPELL_EFFECT_TRIGGER_SPELL);
+        }
+    };
+
+    SpellScript* GetSpellScript() const
+    {
+        return new spell_class_mecagnomo_emergency3_SpellScript();
+    }
+};
+
 void AddSC_generic_spell_scripts()
 {
     RegisterAuraScript(spell_gen_absorb0_hitlimit1);
@@ -4040,8 +4045,6 @@ void AddSC_generic_spell_scripts()
     RegisterAuraScript(spell_gen_creature_permanent_feign_death);
     new spell_gen_dalaran_disguise("spell_gen_sunreaver_disguise");
     new spell_gen_dalaran_disguise("spell_gen_silver_covenant_disguise");
-    new spell_gen_decay_over_time_fungal_decay();
-    new spell_gen_decay_over_time_tail_sting();
     RegisterAuraScript(spell_gen_defend);
     RegisterSpellScript(spell_gen_despawn_self);
     RegisterSpellScript(spell_gen_divine_storm_cd_reset);
@@ -4129,4 +4132,7 @@ void AddSC_generic_spell_scripts()
     RegisterSpellScript(spell_gen_azgalor_rain_of_fire_hellfire_citadel);
     RegisterAuraScript(spell_gen_face_rage);
     RegisterAuraScript(spell_gen_impatient_mind);
+    new spell_class_mecagnomo_emergency();
+    new spell_class_mecagnomo_emergency2();
+    new spell_class_mecagnomo_emergency3();
 }

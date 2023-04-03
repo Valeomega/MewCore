@@ -79,7 +79,7 @@ void PetitionMgr::LoadSignatures()
         if (!petition)
             continue;
 
-        petition->AddSignature(fields[1].GetUInt32(), ObjectGuid::Create<HighGuid::Player>(fields[2].GetUInt64()), true);
+        petition->AddSignature(petition->petitionGuid, fields[1].GetUInt32(), ObjectGuid::Create<HighGuid::Player>(fields[2].GetUInt64()), true);
         ++count;
     } while (result->NextRow());
 
@@ -89,10 +89,10 @@ void PetitionMgr::LoadSignatures()
 void PetitionMgr::AddPetition(ObjectGuid petitionGuid, ObjectGuid ownerGuid, std::string const& name, bool isLoading)
 {
     Petition& p = _petitionStore[petitionGuid];
-    p.PetitionGuid = petitionGuid;
-    p.OwnerGuid = ownerGuid;
-    p.PetitionName = name;
-    p.Signatures.clear();
+    p.petitionGuid = petitionGuid;
+    p.ownerGuid = ownerGuid;
+    p.petitionName = name;
+    p.signatures.clear();
 
     if (isLoading)
         return;
@@ -134,7 +134,7 @@ Petition* PetitionMgr::GetPetition(ObjectGuid petitionGuid)
 Petition* PetitionMgr::GetPetitionByOwner(ObjectGuid ownerGuid)
 {
     for (auto& petitionPair : _petitionStore)
-        if (petitionPair.second.OwnerGuid == ownerGuid)
+        if (petitionPair.second.ownerGuid == ownerGuid)
             return &petitionPair.second;
 
     return nullptr;
@@ -144,7 +144,7 @@ void PetitionMgr::RemovePetitionsByOwner(ObjectGuid ownerGuid)
 {
     for (auto itr = _petitionStore.begin(); itr != _petitionStore.end();)
     {
-        if (itr->second.OwnerGuid == ownerGuid)
+        if (itr->second.ownerGuid == ownerGuid)
         {
             _petitionStore.erase(itr);
             break;
@@ -177,24 +177,24 @@ void PetitionMgr::RemoveSignaturesBySigner(ObjectGuid signerGuid)
 
 bool Petition::IsPetitionSignedByAccount(uint32 accountId) const
 {
-    for (Signature const& signature : Signatures)
+    for (Signature const& signature : signatures)
         if (signature.first == accountId)
             return true;
 
     return false;
 }
 
-void Petition::AddSignature(uint32 accountId, ObjectGuid playerGuid, bool isLoading)
+void Petition::AddSignature(ObjectGuid petitionGuid, uint32 accountId, ObjectGuid playerGuid, bool isLoading)
 {
-    Signatures.emplace_back(accountId, playerGuid);
+    signatures.emplace_back(accountId, playerGuid);
 
     if (isLoading)
         return;
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PETITION_SIGNATURE);
 
-    stmt->setUInt64(0, OwnerGuid.GetCounter());
-    stmt->setUInt64(1, PetitionGuid.GetCounter());
+    stmt->setUInt64(0, ownerGuid.GetCounter());
+    stmt->setUInt64(1, petitionGuid.GetCounter());
     stmt->setUInt64(2, playerGuid.GetCounter());
     stmt->setUInt32(3, accountId);
 
@@ -203,25 +203,25 @@ void Petition::AddSignature(uint32 accountId, ObjectGuid playerGuid, bool isLoad
 
 void Petition::UpdateName(std::string const& newName)
 {
-    PetitionName = newName;
+    petitionName = newName;
 
     CharacterDatabasePreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_PETITION_NAME);
     stmt->setString(0, newName);
-    stmt->setUInt64(1, PetitionGuid.GetCounter());
+    stmt->setUInt64(1, petitionGuid.GetCounter());
     CharacterDatabase.Execute(stmt);
 }
 
 void Petition::RemoveSignatureBySigner(ObjectGuid playerGuid)
 {
-    for (auto itr = Signatures.begin(); itr != Signatures.end(); ++itr)
+    for (auto itr = signatures.begin(); itr != signatures.end(); ++itr)
     {
         if (itr->second == playerGuid)
         {
-            Signatures.erase(itr);
+            signatures.erase(itr);
 
             // notify owner
-            if (Player* owner = ObjectAccessor::FindConnectedPlayer(OwnerGuid))
-                owner->GetSession()->SendPetitionQueryOpcode(PetitionGuid);
+            if (Player* owner = ObjectAccessor::FindConnectedPlayer(ownerGuid))
+                owner->GetSession()->SendPetitionQueryOpcode(petitionGuid);
 
             break;
         }

@@ -106,11 +106,16 @@ void WorldSession::HandleTransmogrifyItems(WorldPackets::Transmogrification::Tra
             return;
         }
 
-        if (transmogItem.ItemModifiedAppearanceID || transmogItem.SecondaryItemModifiedAppearanceID)
+        if (transmogItem.ItemModifiedAppearanceID)
         {
             if (!validateAndStoreTransmogItem(itemTransmogrified, transmogItem.ItemModifiedAppearanceID, false))
                 return;
 
+            // add cost
+            cost += itemTransmogrified->GetSellPrice(_player);
+        }
+        else if (transmogItem.SecondaryItemModifiedAppearanceID)
+        {
             if (!validateAndStoreTransmogItem(itemTransmogrified, transmogItem.SecondaryItemModifiedAppearanceID, true))
                 return;
 
@@ -140,7 +145,6 @@ void WorldSession::HandleTransmogrifyItems(WorldPackets::Transmogrification::Tra
                 TC_LOG_DEBUG("network", "WORLD: HandleTransmogrifyItems - %s, Name: %s tried to transmogrify illusion using not allowed enchant (%d).", player->GetGUID().ToString().c_str(), player->GetName().c_str(), transmogItem.SpellItemEnchantmentID);
                 return;
             }
-
             if (PlayerConditionEntry const* condition = sPlayerConditionStore.LookupEntry(illusion->TransmogUseConditionID))
             {
                 if (!sConditionMgr->IsPlayerMeetingCondition(player, condition))
@@ -149,7 +153,6 @@ void WorldSession::HandleTransmogrifyItems(WorldPackets::Transmogrification::Tra
                     return;
                 }
             }
-
             if (illusion->ScalingClassRestricted > 0 && uint8(illusion->ScalingClassRestricted) != player->getClass())
             {
                 TC_LOG_DEBUG("network", "WORLD: HandleTransmogrifyItems - %s, Name: %s tried to transmogrify illusion using not allowed class enchant (%d).", player->GetGUID().ToString().c_str(), player->GetName().c_str(), transmogItem.SpellItemEnchantmentID);
@@ -163,7 +166,7 @@ void WorldSession::HandleTransmogrifyItems(WorldPackets::Transmogrification::Tra
             resetIllusionItems.push_back(itemTransmogrified);
     }
 
-    if (!player->HasAuraType(SPELL_AURA_REMOVE_TRANSMOG_COST) && cost) // 0 cost if reverting look
+    if (cost) // 0 cost if reverting look
     {
         if (!player->HasEnoughMoney(cost))
             return;
@@ -317,7 +320,6 @@ void WorldSession::HandleTransmogrifyItems(WorldPackets::Transmogrification::Tra
                 item->SetModifier(ITEM_MODIFIER_ENCHANT_ILLUSION_SPEC_3, item->GetModifier(ITEM_MODIFIER_ENCHANT_ILLUSION_ALL_SPECS));
             if (!item->GetModifier(ITEM_MODIFIER_ENCHANT_ILLUSION_SPEC_4))
                 item->SetModifier(ITEM_MODIFIER_ENCHANT_ILLUSION_SPEC_4, item->GetModifier(ITEM_MODIFIER_ENCHANT_ILLUSION_ALL_SPECS));
-
             item->SetModifier(IllusionModifierSlotBySpec[player->GetActiveTalentGroup()], 0);
             item->SetModifier(ITEM_MODIFIER_TRANSMOG_APPEARANCE_ALL_SPECS, 0);
         }

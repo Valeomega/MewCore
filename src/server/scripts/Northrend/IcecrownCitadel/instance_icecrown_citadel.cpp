@@ -441,6 +441,8 @@ class instance_icecrown_citadel : public InstanceMapScript
                 if (!creature)
                     return;
 
+                GameObject* elevator = instance->GetGameObject(LadyDeathwisperElevatorGUID);
+
                 switch (creature->GetEntry())
                 {
                     case NPC_YMIRJAR_BATTLE_MAIDEN:
@@ -488,6 +490,11 @@ class instance_icecrown_citadel : public InstanceMapScript
                         }
                         break;
                     }
+                    case NPC_LADY_DEATHWHISPER:
+                        // seem to need this here to active the lift, otherwise you have to leave and re-enter the instance!
+                          // this activates it on npc death, rather than onload - because it is already loaded!
+                        elevator->SetTransportState(GO_STATE_TRANSPORT_ACTIVE, 7);
+                        break;
                     default:
                         break;
                 }
@@ -528,7 +535,7 @@ class instance_icecrown_citadel : public InstanceMapScript
                     case GO_LADY_DEATHWHISPER_ELEVATOR:
                         LadyDeathwisperElevatorGUID = go->GetGUID();
                         if (GetBossState(DATA_LADY_DEATHWHISPER) == DONE)
-                            go->SetTransportState(GO_STATE_TRANSPORT_ACTIVE);
+                            go->SetTransportState(GO_STATE_TRANSPORT_ACTIVE, 7);
                         break;
                     case GO_THE_SKYBREAKER_H:
                     case GO_ORGRIMS_HAMMER_A:
@@ -845,7 +852,7 @@ class instance_icecrown_citadel : public InstanceMapScript
                                 SetTeleporterState(teleporter, true);
 
                             if (GameObject* elevator = instance->GetGameObject(LadyDeathwisperElevatorGUID))
-                                elevator->SetTransportState(GO_STATE_TRANSPORT_ACTIVE);
+                                elevator->SetTransportState(GO_STATE_TRANSPORT_ACTIVE, 7);
 
                             SpawnGunship();
                         }

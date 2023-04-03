@@ -273,6 +273,7 @@ class TC_GAME_API SpellCastTargets
         float GetSpeedXY() const { return m_speed * std::cos(m_pitch); }
         float GetSpeedZ() const { return m_speed * std::sin(m_pitch); }
 
+        void SetCaster(Unit* caster);
         void Update(Unit* caster);
         void OutDebug() const;
         std::string GetTargetString() const { return m_strTarget; }
@@ -289,6 +290,7 @@ class TC_GAME_API SpellCastTargets
         ObjectGuid m_objectTargetGUID;
         ObjectGuid m_itemTargetGUID;
         uint32 m_itemTargetEntry;
+        Unit* m_caster;
 
         SpellDestination m_src;
         SpellDestination m_dst;
@@ -306,7 +308,6 @@ struct SpellValue
     float     RadiusMod;
     int32     AuraStackAmount;
     float     DurationMul;
-    float     CriticalChance;
 };
 
 enum SpellState
@@ -476,6 +477,7 @@ class TC_GAME_API Spell
         void EffectEnableBattlePets(SpellEffIndex effIndex);
         void EffectLaunchQuestChoice(SpellEffIndex effIndex);
         void EffectUncageBattlePet(SpellEffIndex effIndex);
+        void EffectGrantBattlePetLevel(SpellEffIndex effIndex);
         void EffectCreateHeirloomItem(SpellEffIndex effIndex);
         void EffectUpgradeHeirloom(SpellEffIndex effIndex);
         void EffectApplyEnchantIllusion(SpellEffIndex effIndex);
@@ -490,10 +492,11 @@ class TC_GAME_API Spell
         void EffectRespecAzeriteEmpoweredItem(SpellEffIndex effIndex);
         void EffectLearnAzeriteEssencePower(SpellEffIndex effIndex);
         void EffectCreatePrivateConversation(SpellEffIndex effIndex);
+        void EffectSetChromieTime(SpellEffIndex effIndex);
 
         typedef std::unordered_set<Aura*> UsedSpellMods;
 
-        Spell(Unit* caster, SpellInfo const* info, TriggerCastFlags triggerFlags, ObjectGuid originalCasterGUID = ObjectGuid::Empty);
+        Spell(Unit* caster, SpellInfo const* info, TriggerCastFlags triggerFlags, ObjectGuid originalCasterGUID = ObjectGuid::Empty, bool skipCheck = false);
         ~Spell();
 
         void InitExplicitTargets(SpellCastTargets const& targets);
@@ -525,6 +528,7 @@ class TC_GAME_API Spell
         GameObject* SearchSpellFocus();
 
         void prepare(SpellCastTargets const& targets, AuraEffect const* triggeredByAura = nullptr);
+        void prepare(SpellCastTargets const* targets, AuraEffect const* triggeredByAura = nullptr);
         void cancel();
         void update(uint32 difftime);
         void cast(bool skipCheck = false);
@@ -660,7 +664,6 @@ class TC_GAME_API Spell
         void ReSetTimer() { m_timer = m_casttime > 0 ? m_casttime : 0; }
         bool IsTriggered() const;
         bool IsIgnoringCooldowns() const;
-        bool IsFocusDisabled() const;
         bool IsProcDisabled() const;
         bool IsChannelActive() const;
         bool IsAutoActionResetSpell() const;
@@ -688,6 +691,10 @@ class TC_GAME_API Spell
         Difficulty GetCastDifficulty() const;
         std::vector<SpellPowerCost> const& GetPowerCost() const { return m_powerCost; }
         bool HasPowerTypeCost(Powers power) const;
+
+        Optional<int32> GetPowerTypeCostAmount(Powers power) const;
+        SpellPowerCost const* GetPowerCost(Powers power) const;
+        float GetSpellPowerCostModifier(Powers power) const;
 
         bool UpdatePointers();                              // must be used at call Spell code after time delay (non triggered spell cast/update spell call/etc)
 
@@ -854,7 +861,7 @@ class TC_GAME_API Spell
         void CallScriptOnHitHandlers();
         void CallScriptAfterHitHandlers();
     public:
-        void CallScriptCalcCritChanceHandlers(Unit const* victim, float& chance);
+        void CallScriptCalcCritChanceHandlers(Unit* victim, float& chance);
     protected:
         void CallScriptObjectAreaTargetSelectHandlers(std::list<WorldObject*>& targets, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType);
         void CallScriptObjectTargetSelectHandlers(WorldObject*& target, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType);
@@ -899,6 +906,7 @@ class TC_GAME_API Spell
         // and in same time need aura data and after aura deleting.
         SpellInfo const* m_triggeredByAuraSpell;
 
+        bool m_skipCheck;
         std::unique_ptr<PathGenerator> m_preGeneratedPath;
 
         std::vector<SpellLogEffectPowerDrainParams> _powerDrainTargets[MAX_SPELL_EFFECTS];

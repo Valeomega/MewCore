@@ -27,6 +27,7 @@ class ObjectGuid;
 class PhaseShift;
 class Player;
 class WorldObject;
+
 namespace WorldPackets
 {
     namespace Party
@@ -38,10 +39,10 @@ namespace WorldPackets
 class TC_GAME_API PhasingHandler
 {
 public:
-    static void AddPhase(WorldObject* object, uint32 phaseId, bool updateVisibility);
-    static void RemovePhase(WorldObject* object, uint32 phaseId, bool updateVisibility);
-    static void AddPhaseGroup(WorldObject* object, uint32 phaseGroupId, bool updateVisibility);
-    static void RemovePhaseGroup(WorldObject* object, uint32 phaseGroupId, bool updateVisibility);
+    static void AddPhase(WorldObject* object, uint32 phaseId, bool updateVisibility = true);
+    static void RemovePhase(WorldObject* object, uint32 phaseId, bool updateVisibility = true);
+    static void AddPhaseGroup(WorldObject* object, uint32 phaseGroupId, bool updateVisibility = true);
+    static void RemovePhaseGroup(WorldObject* object, uint32 phaseGroupId, bool updateVisibility = true);
 
     static void AddVisibleMapId(WorldObject* object, uint32 visibleMapId);
     static void RemoveVisibleMapId(WorldObject* object, uint32 visibleMapId);

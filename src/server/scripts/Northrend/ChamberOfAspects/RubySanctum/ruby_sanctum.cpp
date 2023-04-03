@@ -152,12 +152,12 @@ class npc_xerestrasza : public CreatureScript
         }
 };
 
-class at_baltharus_plateau : public OnlyOnceAreaTriggerScript
+class at_baltharus_plateau : public AreaTriggerScript
 {
     public:
-        at_baltharus_plateau() : OnlyOnceAreaTriggerScript("at_baltharus_plateau") { }
+        at_baltharus_plateau() : AreaTriggerScript("at_baltharus_plateau") { }
 
-        bool _OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
+        bool OnTrigger(Player* player, AreaTriggerEntry const* /*areaTrigger*/, bool /*entered*/) override
         {
             // Only trigger once
             if (InstanceScript* instance = player->GetInstanceScript())
@@ -198,7 +198,7 @@ class spell_ruby_sanctum_rallying_shout : public SpellScriptLoader
                 if (_targetCount && !GetCaster()->HasAura(SPELL_RALLY))
                 {
                     CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
-                    args.AddSpellMod(SPELLVALUE_AURA_STACK, _targetCount);
+                    args.SpellValueOverrides.AddMod(SPELLVALUE_AURA_STACK, _targetCount);
                     GetCaster()->CastSpell(GetCaster(), SPELL_RALLY, args);
                 }
             }

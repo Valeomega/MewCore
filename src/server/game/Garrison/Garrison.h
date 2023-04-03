@@ -33,9 +33,7 @@ struct GarrSiteLevelEntry;
 enum GarrisonType
 {
     GARRISON_TYPE_GARRISON      = 2,
-    GARRISON_TYPE_CLASS_ORDER   = 3,
-    GARRISON_TYPE_WAR_CAMPAIGN  = 9,
-    GARRISON_TYPE_COVENANT      = 111
+    GARRISON_TYPE_CLASS_ORDER   = 3
 };
 
 enum GarrisonFactionIndex
@@ -56,11 +54,8 @@ enum GarrisonFollowerFlags
 
 enum GarrisonFollowerType
 {
-    FOLLOWER_TYPE_GARRISON      = 1,
-    FOLLOWER_TYPE_SHIPYARD      = 2,
-    FOLLOWER_TYPE_CLASS_ORDER   = 4,
-    FOLLOWER_TYPE_WAR_CAMPAIGN  = 11,
-    FOLLOWER_TYPE_COVENANT      = 123
+    FOLLOWER_TYPE_GARRISON = 1,
+    FOLLOWER_TYPE_SHIPYARD = 2
 };
 
 enum GarrisonAbilityFlags
@@ -76,6 +71,16 @@ enum GarrisonAbilityFlags
     GARRISON_ABILITY_FLAG_APPLY_TO_FIRST_MISSION        = 0x0100,
     GARRISON_ABILITY_FLAG_IS_SPECIALIZATION             = 0x0200,
     GARRISON_ABILITY_FLAG_IS_EMPTY_SLOT                 = 0x0400
+};
+
+enum MissionState
+{
+    MISSION_STATE_AVAILABLE = 0,
+    MISSION_STATE_IN_PROGRESS = 1,
+    MISSION_STATE_WAITING_BONUS = 2,
+    MISSION_STATE_WAITING_OWERMAX_BONUS = 3,
+    MISSION_STATE_COMPLETED = 5,
+    MISSION_STATE_COMPLETED_OWERMAX = 6
 };
 
 enum GarrisonError
@@ -245,6 +250,10 @@ public:
     void CancelBuildingConstruction(uint32 garrPlotInstanceId);
     void ActivateBuilding(uint32 garrPlotInstanceId);
 
+    // Missions
+  //  Mission const* GetMission(uint64 dbId) const;
+    //Mission* GetMissionByRecID(uint32 missionRecID);
+
     // Followers
     void AddFollower(uint32 garrFollowerId);
     Follower const* GetFollower(uint64 dbId) const;
@@ -274,6 +283,7 @@ private:
     Player* _owner;
     GarrSiteLevelEntry const* _siteLevel;
     uint32 _followerActivationsRemainingToday;
+    uint32 _MissionGen = 0;
 
     std::unordered_map<uint32 /*garrPlotInstanceId*/, Plot> _plots;
     std::unordered_set<uint32 /*garrBuildingId*/> _knownBuildings;

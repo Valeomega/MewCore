@@ -531,12 +531,24 @@ public:
             IsPostEvent = false;
             PostEventTimer = 1000;
             PostEventCount = 0;
-            me->SetReactState(REACT_DEFENSIVE);
         }
 
         bool IsPostEvent;
         uint32 PostEventTimer;
         uint32 PostEventCount;
+
+        void Reset() override
+        {
+            if (!HasEscortState(STATE_ESCORT_ESCORTING))
+            {
+                if (me->GetStandState() == UNIT_STAND_STATE_DEAD)
+                     me->SetStandState(UNIT_STAND_STATE_STAND);
+
+                IsPostEvent = false;
+                PostEventTimer = 1000;
+                PostEventCount = 0;
+            }
+        }
 
         void WaypointReached(uint32 waypointId, uint32 /*pathId*/) override
         {
@@ -591,44 +603,43 @@ public:
 
         void UpdateEscortAI(uint32 Diff) override
         {
-            if (UpdateVictim())
+            if (!UpdateVictim())
             {
-                DoMeleeAttackIfReady();
-                return;
-            }
-
-            if (!IsPostEvent)
-                return;
-
-            if (PostEventTimer > Diff)
-            {
-                PostEventTimer -= Diff;
-                return;
-            }
-
-            switch (PostEventCount)
-            {
-                case 0:
-                    Talk(SAY_PROGRESS_2);
-                    break;
-                case 1:
-                    Talk(SAY_PROGRESS_3);
-                    break;
-                case 2:
-                    Talk(SAY_END);
-                    break;
-                case 3:
-                    if (Player* player = GetPlayerForEscort())
+                if (IsPostEvent)
+                {
+                    if (PostEventTimer <= Diff)
                     {
-                        player->GroupEventHappens(QUEST_ESCAPE, me);
-                        me->DespawnOrUnsummon(3min);
-                        me->SummonCreature(NPC_PILOT_WIZZ, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 180000);
+                        switch (PostEventCount)
+                        {
+                            case 0:
+                                Talk(SAY_PROGRESS_2);
+                                break;
+                            case 1:
+                                Talk(SAY_PROGRESS_3);
+                                break;
+                            case 2:
+                                Talk(SAY_END);
+                                break;
+                            case 3:
+                                if (Player* player = GetPlayerForEscort())
+                                {
+                                    player->GroupEventHappens(QUEST_ESCAPE, me);
+                                    me->SummonCreature(NPC_PILOT_WIZZ, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 180000);
+                                }
+                                break;
+                        }
+
+                        ++PostEventCount;
+                        PostEventTimer = 5000;
                     }
-                    break;
+                    else
+                        PostEventTimer -= Diff;
+                }
+
+                return;
             }
 
-            ++PostEventCount;
-            PostEventTimer = 5000;
+            DoMeleeAttackIfReady();
         }
 
         void QuestAccept(Player* player, Quest const* quest) override
@@ -637,7 +648,6 @@ public:
             {
                 me->SetFaction(FACTION_RATCHET);
                 Talk(SAY_START);
-                SetDespawnAtEnd(false);
                 Start(true, false, player->GetGUID());
             }
         }

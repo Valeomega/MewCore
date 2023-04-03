@@ -93,7 +93,7 @@ class boss_mechano_lord_capacitus : public CreatureScript
                 Talk(YELL_KILL);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*victim*/) override
             {
                 _JustDied();
                 Talk(YELL_DEATH);
@@ -209,7 +209,7 @@ class spell_capacitus_polarity_charge : public SpellScriptLoader
                 Unit* target = GetHitUnit();
 
                 if (target->HasAura(GetTriggeringSpell()->Id))
-                    PreventHitDamage();
+                    SetHitDamage(0);
             }
 
             void Register() override

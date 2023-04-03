@@ -18,7 +18,7 @@
 #include "MMapManager.h"
 #include "Errors.h"
 #include "Log.h"
-#include "MMapDefines.h"
+#include "MapDefines.h"
 
 namespace MMAP
 {

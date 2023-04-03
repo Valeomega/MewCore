@@ -142,7 +142,7 @@ public:
 
                         case 6:
                             Talk(SAY_PERSUADED6);
-                            Unit::Kill(player, me);
+                            player->Kill(me);
                             speechCounter = 0;
                             player->GroupEventHappens(QUEST_HOW_TO_WIN_FRIENDS, me);
                             return;
@@ -550,8 +550,7 @@ public:
         void JustDied(Unit* killer) override
         {
             Talk(SAY_VALROTH_DEATH);
-            if (killer)
-                killer->CastSpell(me, SPELL_SUMMON_VALROTH_REMAINS, true);
+            killer->CastSpell(me, SPELL_SUMMON_VALROTH_REMAINS, true);
         }
     };
 

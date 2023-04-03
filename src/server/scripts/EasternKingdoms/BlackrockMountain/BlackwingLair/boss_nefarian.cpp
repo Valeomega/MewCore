@@ -434,7 +434,7 @@ public:
             Talk(SAY_RANDOM);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*Killer*/) override
         {
             _JustDied();
             Talk(SAY_DEATH);
@@ -455,7 +455,7 @@ public:
 
             if (id == 1)
             {
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
                 if (me->GetVictim())
                     AttackStart(me->GetVictim());
             }
@@ -574,7 +574,7 @@ public:
                     if ((*itr) && !(*itr)->IsAlive())
                     {
                         (*itr)->Respawn();
-                        DoZoneInCombat((*itr));
+                        (*itr)->SetInCombatWithZone();
                         (*itr)->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                         (*itr)->SetReactState(REACT_AGGRESSIVE);
                         (*itr)->SetStandState(UNIT_STAND_STATE_STAND);

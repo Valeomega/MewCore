@@ -69,7 +69,7 @@ void EscortAI::JustDied(Unit* /*killer*/)
     }
 }
 
-void EscortAI::InitializeAI()
+void EscortAI::JustAppeared()
 {
     _escortState = STATE_ESCORT_NONE;
 
@@ -81,6 +81,8 @@ void EscortAI::InitializeAI()
 
     if (me->GetFaction() != me->GetCreatureTemplate()->faction)
         me->RestoreFaction();
+
+    Reset();
 }
 
 void EscortAI::ReturnToLastPoint()

@@ -375,7 +375,7 @@ class npc_stonekeepers : public CreatureScript
                 DoMeleeAttackIfReady();
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*attacker*/) override
             {
                 DoCast (me, SPELL_SELF_DESTRUCT, true);
                 instance->SetData(DATA_STONE_KEEPERS, IN_PROGRESS);    // activate next stonekeeper

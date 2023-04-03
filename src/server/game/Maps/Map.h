@@ -25,13 +25,13 @@
 #include "DynamicTree.h"
 #include "GridDefines.h"
 #include "GridRefManager.h"
-#include "MapDefines.h"
 #include "MapRefManager.h"
 #include "ObjectGuid.h"
 #include "Optional.h"
 #include "SharedDefines.h"
 #include "SpawnData.h"
 #include "Timer.h"
+#include "WildBattlePet.h"
 #include <boost/heap/fibonacci_heap.hpp>
 #include <bitset>
 #include <list>
@@ -81,6 +81,69 @@ struct ScriptAction
     ScriptInfo const* script;                               ///> pointer to static script data
 };
 
+/// Represents a map magic value of 4 bytes (used in versions)
+union u_map_magic
+{
+    char asChar[4]; ///> Non-null terminated string
+    uint32 asUInt;  ///> uint32 representation
+};
+
+// ******************************************
+// Map file format defines
+// ******************************************
+struct map_fileheader
+{
+    u_map_magic mapMagic;
+    u_map_magic versionMagic;
+    uint32 buildMagic;
+    uint32 areaMapOffset;
+    uint32 areaMapSize;
+    uint32 heightMapOffset;
+    uint32 heightMapSize;
+    uint32 liquidMapOffset;
+    uint32 liquidMapSize;
+    uint32 holesOffset;
+    uint32 holesSize;
+};
+
+#define MAP_AREA_NO_AREA      0x0001
+
+struct map_areaHeader
+{
+    uint32 fourcc;
+    uint16 flags;
+    uint16 gridArea;
+};
+
+#define MAP_HEIGHT_NO_HEIGHT            0x0001
+#define MAP_HEIGHT_AS_INT16             0x0002
+#define MAP_HEIGHT_AS_INT8              0x0004
+#define MAP_HEIGHT_HAS_FLIGHT_BOUNDS    0x0008
+
+struct map_heightHeader
+{
+    uint32 fourcc;
+    uint32 flags;
+    float  gridHeight;
+    float  gridMaxHeight;
+};
+
+#define MAP_LIQUID_NO_TYPE    0x0001
+#define MAP_LIQUID_NO_HEIGHT  0x0002
+
+struct map_liquidHeader
+{
+    uint32 fourcc;
+    uint8 flags;
+    uint8 liquidFlags;
+    uint16 liquidType;
+    uint8  offsetX;
+    uint8  offsetY;
+    uint8  width;
+    uint8  height;
+    float  liquidLevel;
+};
+
 enum ZLiquidStatus : uint32
 {
     LIQUID_MAP_NO_WATER     = 0x00000000,
@@ -93,9 +156,19 @@ enum ZLiquidStatus : uint32
 #define MAP_LIQUID_STATUS_SWIMMING (LIQUID_MAP_IN_WATER | LIQUID_MAP_UNDER_WATER)
 #define MAP_LIQUID_STATUS_IN_CONTACT (MAP_LIQUID_STATUS_SWIMMING | LIQUID_MAP_WATER_WALK)
 
+#define MAP_LIQUID_TYPE_NO_WATER    0x00
+#define MAP_LIQUID_TYPE_WATER       0x01
+#define MAP_LIQUID_TYPE_OCEAN       0x02
+#define MAP_LIQUID_TYPE_MAGMA       0x04
+#define MAP_LIQUID_TYPE_SLIME       0x08
+
+#define MAP_ALL_LIQUIDS   (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME)
+
+#define MAP_LIQUID_TYPE_DARK_WATER  0x10
+
 struct LiquidData
 {
-    EnumFlag<map_liquidHeaderTypeFlags> type_flags = map_liquidHeaderTypeFlags::NoWater;
+    uint32 type_flags;
     uint32 entry;
     float  level;
     float  depth_level;
@@ -143,11 +216,11 @@ class TC_GAME_API GridMap
     // Liquid data
     float _liquidLevel;
     uint16* _liquidEntry;
-    map_liquidHeaderTypeFlags* _liquidFlags;
+    uint8* _liquidFlags;
     float* _liquidMap;
     uint16 _gridArea;
     uint16 _liquidGlobalEntry;
-    map_liquidHeaderTypeFlags _liquidGlobalFlags;
+    uint8 _liquidGlobalFlags;
     uint8 _liquidOffX;
     uint8 _liquidOffY;
     uint8 _liquidWidth;
@@ -183,8 +256,8 @@ public:
     inline float getHeight(float x, float y) const {return (this->*_gridGetHeight)(x, y);}
     float getMinHeight(float x, float y) const;
     float getLiquidLevel(float x, float y) const;
-    map_liquidHeaderTypeFlags getTerrainType(float x, float y) const;
-    ZLiquidStatus GetLiquidStatus(float x, float y, float z, Optional<map_liquidHeaderTypeFlags> ReqLiquidType, LiquidData* data = nullptr, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
+    uint8 getTerrainType(float x, float y) const;
+    ZLiquidStatus GetLiquidStatus(float x, float y, float z, uint8 ReqLiquidType, LiquidData* data = nullptr, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
 };
 
 #pragma pack(push, 1)
@@ -209,6 +282,8 @@ struct ZoneDynamicInfo
 #define DEFAULT_HEIGHT_SEARCH     50.0f                     // default search distance to find height at nearby locations
 #define MIN_UNLOAD_DELAY      1                             // immediate unload
 #define MAP_INVALID_ZONE      0xFFFFFFFF
+
+typedef std::map<ObjectGuid::LowType/*leaderDBGUID*/, CreatureGroup*> CreatureGroupHolderType;
 
 struct RespawnInfo; // forward declaration
 struct CompareRespawnInfo
@@ -327,9 +402,9 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void AddChildTerrainMap(Map* map) { m_childTerrainMaps->push_back(map); map->m_parentTerrainMap = this; }
         void UnlinkAllChildTerrainMaps() { m_childTerrainMaps->clear(); }
 
-        void GetFullTerrainStatusForPosition(float x, float y, float z, PositionFullTerrainStatus& data, map_liquidHeaderTypeFlags reqLiquidType = map_liquidHeaderTypeFlags::AllLiquids, float collisionHeight = 2.03128f) const; // DEFAULT_COLLISION_HEIGHT in Object.h
-        void GetFullTerrainStatusForPosition(PhaseShift const& phaseShift, float x, float y, float z, PositionFullTerrainStatus& data, map_liquidHeaderTypeFlags reqLiquidType = map_liquidHeaderTypeFlags::AllLiquids, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
-        ZLiquidStatus GetLiquidStatus(PhaseShift const& phaseShift, float x, float y, float z, map_liquidHeaderTypeFlags ReqLiquidType, LiquidData* data = nullptr, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
+        void GetFullTerrainStatusForPosition(float x, float y, float z, PositionFullTerrainStatus& data, uint8 reqLiquidType = MAP_ALL_LIQUIDS, float collisionHeight = 2.03128f) const; // DEFAULT_COLLISION_HEIGHT in Object.h
+        void GetFullTerrainStatusForPosition(PhaseShift const& phaseShift, float x, float y, float z, PositionFullTerrainStatus& data, uint8 reqLiquidType = MAP_ALL_LIQUIDS, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
+        ZLiquidStatus GetLiquidStatus(PhaseShift const& phaseShift, float x, float y, float z, uint8 ReqLiquidType, LiquidData* data = nullptr, float collisionHeight = 2.03128f); // DEFAULT_COLLISION_HEIGHT in Object.h
 
         bool GetAreaInfo(PhaseShift const& phaseShift, float x, float y, float z, uint32& mogpflags, int32& adtId, int32& rootId, int32& groupId);
         uint32 GetAreaId(PhaseShift const& phaseShift, float x, float y, float z, bool *isOutdoors = nullptr);
@@ -341,7 +416,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         bool IsOutdoors(PhaseShift const& phaseShift, float x, float y, float z);
 
-        map_liquidHeaderTypeFlags GetTerrainType(PhaseShift const& phaseShift, float x, float y);
+        uint8 GetTerrainType(PhaseShift const& phaseShift, float x, float y);
         float GetWaterLevel(PhaseShift const& phaseShift, float x, float y);
         bool IsInWater(PhaseShift const& phaseShift, float x, float y, float z, LiquidData* data = nullptr);
         bool IsUnderWater(PhaseShift const& phaseShift, float x, float y, float z);
@@ -383,16 +458,19 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         // have meaning only for instanced map (that have set real difficulty)
         Difficulty GetDifficultyID() const { return Difficulty(i_spawnMode); }
+        uint8 GetSpawnMode() const;
         MapDifficultyEntry const* GetMapDifficulty() const;
         ItemContext GetDifficultyLootItemContext() const;
 
         uint32 GetId() const;
         bool Instanceable() const;
         bool IsDungeon() const;
+        bool isChallenge() const { return i_spawnMode == DIFFICULTY_MYTHIC_KEYSTONE; }
         bool IsNonRaidDungeon() const;
         bool IsRaid() const;
         bool IsRaidOrHeroicDungeon() const;
         bool IsHeroic() const;
+        bool IsMythic() const;
         bool Is25ManRaid() const;
         bool IsBattleground() const;
         bool IsBattleArena() const;
@@ -420,6 +498,10 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         typedef MapRefManager PlayerList;
         PlayerList const& GetPlayers() const { return m_mapRefManager; }
 
+        void ApplyOnEveryPlayer(std::function<void(Player*)> function);
+
+        uint32 GetPlayerCount() const { return m_mapRefManager.getSize(); }
+
         //per-map script storage
         void ScriptsStart(std::map<uint32, std::multimap<uint32, ScriptInfo> > const& scripts, uint32 id, Object* source, Object* target);
         void ScriptCommandStart(ScriptInfo const& script, uint32 delay, Object* source, Object* target);
@@ -433,7 +515,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         void RemoveFromActive(T* obj);
 
         template<class T> void SwitchGridContainers(T* obj, bool on);
-        std::unordered_map<ObjectGuid::LowType /*leaderSpawnId*/, CreatureGroup*> CreatureGroupHolder;
+        CreatureGroupHolderType CreatureGroupHolder;
 
         void UpdateIteratorBack(Player* player);
 
@@ -451,6 +533,10 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
         Creature* GetCreatureBySpawnId(ObjectGuid::LowType spawnId) const;
         GameObject* GetGameObjectBySpawnId(ObjectGuid::LowType spawnId) const;
         WorldObject* GetWorldObjectBySpawnId(SpawnObjectType type, ObjectGuid::LowType spawnId) const { return (type == SPAWN_TYPE_GAMEOBJECT) ? reinterpret_cast<WorldObject*>(GetGameObjectBySpawnId(spawnId)) : reinterpret_cast<WorldObject*>(GetCreatureBySpawnId(spawnId)); }
+        WildBattlePetPool* GetWildBattlePetPool(Creature* creature);
+
+        uint32 m_activeEntry;
+        uint32 m_activeEncounter;
 
         MapStoredObjectTypesContainer& GetObjectsStore() { return _objectsStore; }
 
@@ -550,10 +636,10 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         void SetZoneMusic(uint32 zoneId, uint32 musicId);
         Weather* GetOrGenerateZoneDefaultWeather(uint32 zoneId);
-        WeatherState GetZoneWeather(uint32 zoneId) const;
         void SetZoneWeather(uint32 zoneId, WeatherState weatherId, float weatherGrade);
         void SetZoneOverrideLight(uint32 zoneId, uint32 lightId, uint32 fadeInTime);
 
+        void AddBattlePet(Creature* creature);
         void UpdateAreaDependentAuras();
 
         template<HighGuid high>
@@ -636,6 +722,12 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         void setNGrid(NGridType* grid, uint32 x, uint32 y);
         void ScriptsProcess();
+
+      
+        void RemoveBattlePet(Creature* creature);
+        void PopulateBattlePet(uint32 diff);
+        void DepopulateBattlePet();
+        std::map<uint16, std::map<uint32, WildBattlePetPool>> m_wildBattlePetPool;
 
         void SendObjectUpdates();
 
@@ -761,7 +853,7 @@ class TC_GAME_API Map : public GridRefManager<NGridType>
 
         SpawnGroupTemplateData const* GetSpawnGroupData(uint32 groupId) const;
         bool SpawnGroupSpawn(uint32 groupId, bool ignoreRespawn = false, bool force = false, std::vector<WorldObject*>* spawnedObjects = nullptr);
-        bool SpawnGroupDespawn(uint32 groupId, bool deleteRespawnTimes = false, size_t* count = nullptr);
+        bool SpawnGroupDespawn(uint32 groupId, bool deleteRespawnTimes = false);
         void SetSpawnGroupActive(uint32 groupId, bool state);
         bool IsSpawnGroupActive(uint32 groupId) const;
 

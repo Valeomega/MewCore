@@ -56,7 +56,7 @@ Appender* Log::GetAppenderByName(std::string const& name)
     return it == appenders.end() ? nullptr : it->second.get();
 }
 
-void Log::CreateAppenderFromConfigLine(std::string const& appenderName, std::string const& options)
+void Log::CreateAppenderFromConfig(std::string const& appenderName)
 {
     if (appenderName.empty())
         return;
@@ -64,6 +64,7 @@ void Log::CreateAppenderFromConfigLine(std::string const& appenderName, std::str
     // Format = type, level, flags, optional1, optional2
     // if type = File. optional1 = file and option2 = mode
     // if type = Console. optional1 = Color
+    std::string options = sConfigMgr->GetStringDefault(appenderName, "");
 
     Tokenizer tokens(options, ',');
     auto iter = tokens.begin();
@@ -108,20 +109,16 @@ void Log::CreateAppenderFromConfigLine(std::string const& appenderName, std::str
     }
 }
 
-void Log::CreateAppenderFromConfig(std::string const& appenderName)
+void Log::CreateLoggerFromConfig(std::string const& appenderName)
 {
-    CreateAppenderFromConfigLine(appenderName, sConfigMgr->GetStringDefault(appenderName, ""));
-}
-
-void Log::CreateLoggerFromConfigLine(std::string const& loggerName, std::string const& options)
-{
-    if (loggerName.empty())
+    if (appenderName.empty())
         return;
 
     LogLevel level = LOG_LEVEL_DISABLED;
     uint8 type = uint8(-1);
 
-    std::string name = loggerName.substr(7);
+    std::string options = sConfigMgr->GetStringDefault(appenderName, "");
+    std::string name = appenderName.substr(7);
 
     if (options.empty())
     {
@@ -173,11 +170,6 @@ void Log::CreateLoggerFromConfigLine(std::string const& loggerName, std::string 
             fprintf(stderr, "Error while configuring Appender %s in Logger %s. Appender does not exist", str.c_str(), name.c_str());
         ss >> str;
     }
-}
-
-void Log::CreateLoggerFromConfig(std::string const& loggerName)
-{
-    CreateLoggerFromConfigLine(loggerName, sConfigMgr->GetStringDefault(loggerName, ""));
 }
 
 void Log::ReadAppendersFromConfig()

@@ -276,8 +276,10 @@ public:
     virtual void SendAllData(Player const* receiver) const = 0;
 
     void UpdateTimedCriteria(uint32 timeDiff);
-    void StartCriteriaTimer(CriteriaStartEvent startEvent, uint32 entry, uint32 timeLost = 0);
-    void RemoveCriteriaTimer(CriteriaStartEvent startEvent, uint32 entry);   // used for quest and scripted timed s
+    void StartCriteriaTimer(CriteriaTimedTypes type, uint32 entry, uint32 timeLost = 0);
+    void RemoveCriteriaTimer(CriteriaTimedTypes type, uint32 entry);   // used for quest and scripted timed s
+    bool CheckCompletedCriteriaTree(CriteriaTree const* tree, Player* referencePlayer);
+    bool CheckCompletedCriteriaTree(uint32 Criteriatreeid, Player* referencePlayer);
 
 protected:
     virtual void SendCriteriaUpdate(Criteria const* criteria, CriteriaProgress const* progress, Seconds timeElapsed, bool timedCompleted) const = 0;
@@ -309,6 +311,7 @@ protected:
 
     CriteriaProgressMap _criteriaProgress;
     std::map<uint32, uint32 /*ms time left*/> _timeCriteriaTrees;
+    std::set<uint32> _completedCriteriaTree;
 };
 
 class TC_GAME_API CriteriaMgr
@@ -345,15 +348,15 @@ public:
         return itr != _criteriaTreeByCriteria.end() ? &itr->second : nullptr;
     }
 
-    CriteriaList const& GetTimedCriteriaByType(CriteriaStartEvent startEvent) const
+    CriteriaList const& GetTimedCriteriaByType(CriteriaTimedTypes type) const
     {
-        return _criteriasByTimedType[size_t(startEvent)];
+        return _criteriasByTimedType[type];
     }
 
-    CriteriaList const* GetCriteriaByFailEvent(CriteriaFailEvent condition, int32 asset)
+    CriteriaList const* GetCriteriaByFailEvent(CriteriaCondition condition, int32 asset)
     {
-        auto itr = _criteriasByFailEvent[size_t(condition)].find(asset);
-        return itr != _criteriasByFailEvent[size_t(condition)].end() ? &itr->second : nullptr;
+        auto itr = _criteriasByFailEvent[condition].find(asset);
+        return itr != _criteriasByFailEvent[condition].end() ? &itr->second : nullptr;
     }
 
     CriteriaDataSet const* GetCriteriaDataSet(Criteria const* Criteria) const
@@ -412,8 +415,8 @@ private:
     CriteriaList _scenarioCriteriasByType[CRITERIA_TYPE_TOTAL];
     CriteriaList _questObjectiveCriteriasByType[CRITERIA_TYPE_TOTAL];
 
-    CriteriaList _criteriasByTimedType[size_t(CriteriaStartEvent::Count)];
-    std::unordered_map<int32, CriteriaList> _criteriasByFailEvent[size_t(CriteriaFailEvent::Count)];
+    CriteriaList _criteriasByTimedType[CRITERIA_TIMED_TYPE_MAX];
+    std::unordered_map<int32, CriteriaList> _criteriasByFailEvent[CRITERIA_CONDITION_MAX];
 };
 
 #define sCriteriaMgr CriteriaMgr::Instance()

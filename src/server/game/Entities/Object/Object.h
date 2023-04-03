@@ -130,6 +130,7 @@ float const DEFAULT_COLLISION_HEIGHT = 2.03128f; // Most common value in dbc
 class TC_GAME_API Object
 {
     public:
+        HellgarveCore::AnyData Variables;
         virtual ~Object();
 
         bool IsInWorld() const { return m_inWorld; }
@@ -414,8 +415,10 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         Position GetFirstCollisionPosition(float dist, float angle);
         Position GetRandomNearPosition(float radius);
         void GetContactPoint(WorldObject const* obj, float &x, float &y, float &z, float distance2d = CONTACT_DISTANCE) const;
+        uint32 GetCurrentAreaID() const { return m_areaId; }
 
         virtual float GetCombatReach() const { return 0.0f; } // overridden (only) in Unit
+        float GetObjectSize() const;
         void UpdateGroundPositionZ(float x, float y, float &z) const;
         void UpdateAllowedPositionZ(float x, float y, float &z) const;
 
@@ -428,6 +431,7 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         {
             return GetPhaseShift().CanSee(obj->GetPhaseShift());
         }
+
         static bool InSamePhase(WorldObject const* a, WorldObject const* b)
         {
             return a && b && a->IsInPhase(b);
@@ -513,6 +517,12 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         FlaggedValuesArray32<int32, uint32, ServerSideVisibilityType, TOTAL_SERVERSIDE_VISIBILITY_TYPES> m_serverSideVisibility;
         FlaggedValuesArray32<int32, uint32, ServerSideVisibilityType, TOTAL_SERVERSIDE_VISIBILITY_TYPES> m_serverSideVisibilityDetect;
 
+        bool IsRWVisibility();
+        float GetRWVisibility();
+        void SetRWVisibilityRange(float rwvisible);
+        bool m_rwVisibility;
+        float m_rwVisibilityRange;
+
         virtual void SetMap(Map* map);
         virtual void ResetMap();
         Map* GetMap() const { ASSERT(m_currMap); return m_currMap; }
@@ -527,24 +537,39 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         TempSummon* SummonCreature(uint32 entry, Position const& pos, TempSummonType despawnType = TEMPSUMMON_MANUAL_DESPAWN, uint32 despawnTime = 0, uint32 vehId = 0, ObjectGuid privateObjectOwner = ObjectGuid::Empty);
         TempSummon* SummonCreature(uint32 entry, Position const& pos, TempSummonType despawnType, Milliseconds const& despawnTime, uint32 vehId = 0, ObjectGuid privateObjectOwner = ObjectGuid::Empty) { return SummonCreature(entry, pos, despawnType, uint32(despawnTime.count()), vehId, privateObjectOwner); }
         TempSummon* SummonCreature(uint32 entry, float x, float y, float z, float o = 0, TempSummonType despawnType = TEMPSUMMON_MANUAL_DESPAWN, uint32 despawnTime = 0, ObjectGuid privateObjectOwner = ObjectGuid::Empty);
-        GameObject* SummonGameObject(uint32 entry, Position const& pos, QuaternionData const& rot, uint32 respawnTime /* s */, GOSummonType summonType = GO_SUMMON_TIMED_OR_CORPSE_DESPAWN);
+        GameObject* SummonGameObject(uint32 entry, Position const& pos, QuaternionData const& rot, uint32 respawnTime /* s */);
         GameObject* SummonGameObject(uint32 entry, float x, float y, float z, float ang, QuaternionData const& rot, uint32 respawnTime /* s */);
         Creature*   SummonTrigger(float x, float y, float z, float ang, uint32 dur, CreatureAI* (*GetAI)(Creature*) = nullptr);
         void SummonCreatureGroup(uint8 group, std::list<TempSummon*>* list = nullptr);
+   
+        Creature* FindNearestCreature(uint32 entry, float range, bool alive = true) const;
+        Creature* FindNearestCreature(std::list<uint32> entrys, float range, bool alive = true) const;
+        std::list<Creature*>    FindNearestCreatures(uint32 entry, float range) const;
+        Creature* FindNearestCreatureOnTransportInFloor(uint32 entry, float rangeXY, float rangeZ);
+        std::list<Creature*>    FindAllCreaturesInRange(float range);
+        Creature* FindNearestAttackableCreatureOnTransportInFloor(float rangeXY, float rangeZ);
+        std::list<Creature*>    FindAllUnfriendlyCreaturesInRange(float range);
 
-        Creature*   FindNearestCreature(uint32 entry, float range, bool alive = true) const;
+        std::list<GameObject*>  FindNearestGameObjects(uint32 entry, float range) const;
         GameObject* FindNearestGameObject(uint32 entry, float range) const;
         GameObject* FindNearestGameObjectOfType(GameobjectTypes type, float range) const;
         Player* SelectNearestPlayer(float distance) const;
+        std::list<Player*>      SelectNearestPlayers(float range, bool alive = true);
+
+        AreaTrigger* SelectNearestAreaTrigger(uint32 spellId, float distance = 0.0f) const;
+        std::list<AreaTrigger*> SelectNearestAreaTriggers(uint32 spellId, float range);
 
         template <typename Container>
         void GetGameObjectListWithEntryInGrid(Container& gameObjectContainer, uint32 entry, float maxSearchRange = 250.0f) const;
 
-        template <typename Container>
-        void GetCreatureListWithEntryInGrid(Container& creatureContainer, uint32 entry, float maxSearchRange = 250.0f) const;
 
         template <typename Container>
         void GetPlayerListInGrid(Container& playerContainer, float maxSearchRange) const;
+
+        template <typename Container>
+        void GetCreatureListWithEntryInGrid(Container& creatureContainer, uint32 entry, float maxSearchRange = 250.0f) const;
+
+        void GetCreatureListWithEntryInGridAppend(std::list<Creature*>& lList, uint32 uiEntry, float fMaxSearchRange = 250.0f) const;
 
         void DestroyForNearbyPlayers();
         virtual void UpdateObjectVisibility(bool forced = true);

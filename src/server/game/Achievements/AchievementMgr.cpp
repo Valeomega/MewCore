@@ -47,7 +47,7 @@ struct VisibleAchievementCheck
     }
 };
 
-AchievementMgr::AchievementMgr() : _achievementPoints(0) { }
+AchievementMgr::AchievementMgr() : _achievementPoints(0), _achievementBattlePetPoints(0) { }
 
 AchievementMgr::~AchievementMgr() { }
 
@@ -69,16 +69,6 @@ bool AchievementMgr::HasAchieved(uint32 achievementId) const
 uint32 AchievementMgr::GetAchievementPoints() const
 {
     return _achievementPoints;
-}
-
-std::vector<uint32> AchievementMgr::GetCompletedAchievementIds() const
-{
-    std::vector<uint32> achievementIds;
-    std::transform(_completedAchievements.begin(), _completedAchievements.end(), std::back_inserter(achievementIds), [](std::pair<uint32 const, CompletedAchievementData> const& achievement)
-    {
-        return achievement.first;
-    });
-    return achievementIds;
 }
 
 bool AchievementMgr::CanUpdateCriteriaTree(Criteria const* criteria, CriteriaTree const* tree, Player* referencePlayer) const
@@ -224,6 +214,7 @@ void PlayerAchievementMgr::Reset()
 
     _completedAchievements.clear();
     _achievementPoints = 0;
+    _achievementBattlePetPoints = 0;
     DeleteFromDB(_owner->GetGUID());
 
     // re-fill data
@@ -264,6 +255,9 @@ void PlayerAchievementMgr::LoadFromDB(PreparedQueryResult achievementResult, Pre
             ca.Changed = false;
 
             _achievementPoints += achievement->Points;
+
+            if (achievement->Category == 15117) // BattlePet category
+                 _achievementBattlePetPoints += achievement->Points;
 
             // title achievement rewards are retroactive
             if (AchievementReward const* reward = sAchievementMgr->GetAchievementReward(achievement))
@@ -360,15 +354,15 @@ void PlayerAchievementMgr::SaveToDB(CharacterDatabaseTransaction& trans)
     }
 }
 
-void PlayerAchievementMgr::ResetCriteria(CriteriaFailEvent failEvent, int32 failAsset, bool evenIfCriteriaComplete)
+void PlayerAchievementMgr::ResetCriteria(CriteriaCondition condition, int32 failAsset, bool evenIfCriteriaComplete)
 {
-    TC_LOG_DEBUG("criteria.achievement", "PlayerAchievementMgr::ResetCriteria(%u, %d, %s)", uint32(failEvent), failAsset, evenIfCriteriaComplete ? "true" : "false");
+    TC_LOG_DEBUG("criteria.achievement", "PlayerAchievementMgr::ResetCriteria(%u, %d, %s)", condition, failAsset, evenIfCriteriaComplete ? "true" : "false");
 
     // disable for gamemasters with GM-mode enabled
     if (_owner->IsGameMaster())
         return;
 
-    if (CriteriaList const* achievementCriteriaList = sCriteriaMgr->GetCriteriaByFailEvent(failEvent, failAsset))
+    if (CriteriaList const* achievementCriteriaList = sCriteriaMgr->GetCriteriaByFailEvent(condition, failAsset))
     {
         for (Criteria const* achievementCriteria : *achievementCriteriaList)
         {
@@ -388,6 +382,21 @@ void PlayerAchievementMgr::ResetCriteria(CriteriaFailEvent failEvent, int32 fail
                 continue;
 
             RemoveCriteriaProgress(achievementCriteria);
+        }
+    }
+}
+
+void PlayerAchievementMgr::ResetCriteriaId(CriteriaTypes type, uint32 id)
+{
+    TC_LOG_DEBUG("criteria.achievement", "PlayerAchievementMgr::ResetCriteriaId(%u)", id);
+    CriteriaList list = GetCriteriaByType(type, id);
+
+    for (Criteria const* crit : list)
+    {
+        if (crit->Entry->ID == id)
+        {
+            RemoveCriteriaProgress(crit);
+            break;
         }
     }
 }
@@ -522,11 +531,29 @@ void PlayerAchievementMgr::CompletedAchievement(AchievementEntry const* achievem
     if (achievement->Flags & (ACHIEVEMENT_FLAG_REALM_FIRST_REACH | ACHIEVEMENT_FLAG_REALM_FIRST_KILL))
         sAchievementMgr->SetRealmCompleted(achievement);
 
-    if (!(achievement->Flags & ACHIEVEMENT_FLAG_TRACKING_FLAG))
-        _achievementPoints += achievement->Points;
+    if (achievement->Category == 15117) // BattlePet category
+        _achievementBattlePetPoints += achievement->Points;
 
-    UpdateCriteria(CRITERIA_TYPE_COMPLETE_ACHIEVEMENT, achievement->ID, 0, 0, nullptr, referencePlayer);
+    if (achievement->Category == 15117) // BattlePet category
+        UpdateCriteria(CRITERIA_TYPE_EARN_PET_BATTLE_ACHIEVEMENT_POINTS, achievement->Points, 0, 0, nullptr, referencePlayer);
+
+    UpdateCriteria(CRITERIA_TYPE_COMPLETE_ACHIEVEMENT, 0, 0, 0, nullptr, referencePlayer);
     UpdateCriteria(CRITERIA_TYPE_EARN_ACHIEVEMENT_POINTS, achievement->Points, 0, 0, nullptr, referencePlayer);
+
+    switch (achievement->ID)
+    {
+    case 7433: ///< Newbie
+    case 6566: ///< Just a Pup
+        _owner->GetSession()->SendPetBattleSlotUpdates(true);
+        _owner->GetSession()->SendBattlePetLicenseChanged();
+        break;
+    case 6556: ///< Going to Need More Traps
+    case 6581: ///< Pro Pet Crew
+        _owner->GetSession()->SendBattlePetTrapLevel();
+        break;
+    default:
+        break;
+    }
 
     // reward items and titles if any
     AchievementReward const* reward = sAchievementMgr->GetAchievementReward(achievement);
@@ -715,6 +742,7 @@ void GuildAchievementMgr::Reset()
     }
 
     _achievementPoints = 0;
+    _achievementBattlePetPoints = 0;
     _completedAchievements.clear();
     DeleteFromDB(guid);
 }
@@ -971,6 +999,12 @@ void GuildAchievementMgr::CompletedAchievement(AchievementEntry const* achieveme
 
     if (!(achievement->Flags & ACHIEVEMENT_FLAG_TRACKING_FLAG))
         _achievementPoints += achievement->Points;
+
+    if (achievement->Category == 15117) // BattlePet category
+    {
+        _achievementBattlePetPoints += achievement->Points;
+        UpdateCriteria(CRITERIA_TYPE_EARN_PET_BATTLE_ACHIEVEMENT_POINTS, achievement->Points, 0, 0, nullptr, referencePlayer);
+    }
 
     UpdateCriteria(CRITERIA_TYPE_COMPLETE_ACHIEVEMENT, achievement->ID, 0, 0, nullptr, referencePlayer);
     UpdateCriteria(CRITERIA_TYPE_EARN_ACHIEVEMENT_POINTS, achievement->Points, 0, 0, nullptr, referencePlayer);

@@ -162,7 +162,7 @@ void Quest::LoadQuestDetails(Field* fields)
     {
         if (!sEmotesStore.LookupEntry(fields[1 + i].GetUInt16()))
         {
-            TC_LOG_ERROR("sql.sql", "Table `quest_details` has non-existing Emote%i (%u) set for quest %u. Skipped.", 1+i, fields[1+i].GetUInt16(), fields[0].GetUInt32());
+            TC_LOG_ERROR("sql.sql", "Table `quest_details` has non-existing Emote%i (%u) set for quest %u. Skipped.", 1 + i, fields[1 + i].GetUInt16(), fields[0].GetUInt32());
             continue;
         }
 
@@ -195,7 +195,7 @@ void Quest::LoadQuestOfferReward(Field* fields)
     {
         if (!sEmotesStore.LookupEntry(fields[1 + i].GetUInt16()))
         {
-            TC_LOG_ERROR("sql.sql", "Table `quest_offer_reward` has non-existing Emote%i (%u) set for quest %u. Skipped.", 1+i, fields[1+i].GetUInt16(), fields[0].GetUInt32());
+            TC_LOG_ERROR("sql.sql", "Table `quest_offer_reward` has non-existing Emote%i (%u) set for quest %u. Skipped.", 1 + i, fields[1 + i].GetUInt16(), fields[0].GetUInt32());
             continue;
         }
 
@@ -290,7 +290,7 @@ uint32 Quest::XPValue(Player const* player) const
 
         uint32 xp = diffFactor * questXp->Difficulty[_rewardXPDifficulty] * _rewardXPMultiplier / 10;
         if (player->getLevel() >= GetMaxLevelForExpansion(CURRENT_EXPANSION - 1) && player->GetSession()->GetExpansion() == CURRENT_EXPANSION && _expansion < CURRENT_EXPANSION)
-            xp = uint32(xp / 9.0f);
+            xp = uint32(round(xp / 9.0f));
 
         xp = RoundXPValue(xp);
 
@@ -300,7 +300,7 @@ uint32 Quest::XPValue(Player const* player) const
             xp = std::max(minScaledXP, xp);
         }
 
-        return xp;
+        return abs(round(xp));
     }
 
     return 0;
@@ -324,13 +324,13 @@ Optional<QuestTagType> Quest::GetQuestTag() const
 
 void Quest::BuildQuestRewards(WorldPackets::Quest::QuestRewards& rewards, Player* player) const
 {
-    rewards.ChoiceItemCount         = GetRewChoiceItemsCount();
-    rewards.ItemCount               = GetRewItemsCount();
-    rewards.Money                   = player->GetQuestMoneyReward(this);
-    rewards.XP                      = player->GetQuestXPReward(this);
-    rewards.ArtifactCategoryID      = GetArtifactCategoryId();
-    rewards.Title                   = GetRewTitle();
-    rewards.FactionFlags            = GetRewardReputationMask();
+    rewards.ChoiceItemCount = GetRewChoiceItemsCount();
+    rewards.ItemCount = GetRewItemsCount();
+    rewards.Money = player->GetQuestMoneyReward(this);
+    rewards.XP = player->GetQuestXPReward(this);
+    rewards.ArtifactCategoryID = GetArtifactCategoryId();
+    rewards.Title = GetRewTitle();
+    rewards.FactionFlags = GetRewardReputationMask();
     auto displaySpellItr = rewards.SpellCompletionDisplayID.begin();
     for (QuestRewardDisplaySpell displaySpell : RewardDisplaySpell)
     {
@@ -343,10 +343,10 @@ void Quest::BuildQuestRewards(WorldPackets::Quest::QuestRewards& rewards, Player
             break;
     }
 
-    rewards.SpellCompletionID       = GetRewSpell();
-    rewards.SkillLineID             = GetRewardSkillId();
-    rewards.NumSkillUps             = GetRewardSkillPoints();
-    rewards.TreasurePickerID        = GetTreasurePickerId();
+    rewards.SpellCompletionID = GetRewSpell();
+    rewards.SkillLineID = GetRewardSkillId();
+    rewards.NumSkillUps = GetRewardSkillPoints();
+    rewards.TreasurePickerID = GetTreasurePickerId();
 
     for (uint32 i = 0; i < QUEST_REWARD_CHOICES_COUNT; ++i)
     {
@@ -400,20 +400,69 @@ bool Quest::IsRaidQuest(Difficulty difficulty) const
 {
     switch (_questInfoID)
     {
-        case QUEST_INFO_RAID:
-            return true;
-        case QUEST_INFO_RAID_10:
-            return difficulty == DIFFICULTY_10_N || difficulty == DIFFICULTY_10_HC;
-        case QUEST_INFO_RAID_25:
-            return difficulty == DIFFICULTY_25_N || difficulty == DIFFICULTY_25_HC;
-        default:
-            break;
+    case QUEST_INFO_RAID:
+        return true;
+    case QUEST_INFO_RAID_10:
+        return difficulty == DIFFICULTY_10_N || difficulty == DIFFICULTY_10_HC;
+    case QUEST_INFO_RAID_25:
+        return difficulty == DIFFICULTY_25_N || difficulty == DIFFICULTY_25_HC;
+    default:
+        break;
     }
 
     if ((_flags & QUEST_FLAGS_RAID) != 0)
         return true;
 
     return false;
+}
+
+bool Quest::IsWorldQuest() const
+{
+    if (HasFlagEx(QUEST_FLAGS_EX_IS_WORLD_QUEST))
+        return true;
+
+    switch (QuestInfoID)
+    {
+    case QUEST_INFO_WORLD_QUEST:
+    case QUEST_INFO_EPIC_WORLD_QUEST:
+    case QUEST_INFO_ELITE_WORLD_QUEST:
+    case QUEST_INFO_EPIC_ELITE_WORLD_QUEST:
+    case QUEST_INFO_PVP_WORLD_QUEST:
+    case QUEST_INFO_FIRST_AID_WORLD_QUEST:
+    case QUEST_INFO_BATTLE_PET_WORLD_QUEST:
+    case QUEST_INFO_BLACKSMITHING_WORLD_QUEST:
+    case QUEST_INFO_LEATHERWORKING_WORLD_QUEST:
+    case QUEST_INFO_ALCHEMY_WORLD_QUEST:
+    case QUEST_INFO_HERBALISM_WORLD_QUEST:
+    case QUEST_INFO_MINING_WORLD_QUEST:
+    case QUEST_INFO_TAILORING_WORLD_QUEST:
+    case QUEST_INFO_ENGINEERING_WORLD_QUEST:
+    case QUEST_INFO_ENCHANTING_WORLD_QUEST:
+    case QUEST_INFO_SKINNING_WORLD_QUEST:
+    case QUEST_INFO_JEWELCRAFTING_WORLD_QUEST:
+    case QUEST_INFO_INSCRIPTION_WORLD_QUEST:
+    case QUEST_INFO_ARCHEOLOGY_WORLD_QUEST:
+    case QUEST_INFO_FISHING_WORLD_QUEST:
+    case QUEST_INFO_COOKING_WORLD_QUEST:
+    case QUEST_INFO_RARE_WORLD_QUEST:
+    case QUEST_INFO_RARE_ELITE_WORLD_QUEST:
+    case QUEST_INFO_DUNGEON_WORLD_QUEST:
+    case QUEST_INFO_LEGION_INVASION_WORLD_QUEST:
+    case QUEST_INFO_RAID_WORLD_QUEST:
+    case QUEST_INFO_LEGION_INVASION_ELITE_WORLD_QUEST:
+    case QUEST_INFO_LEGIONFALL_WORLD_QUEST:
+    case QUEST_INFO_LEGIONFALL_DUNGEON_WORLD_QUEST:
+    case QUEST_INFO_LEGION_INVASION_WORLD_QUEST_WRAPPER:
+    case QUEST_INFO_MAGNI_WORLD_QUEST_AZERITE:
+    case QUEST_INFO_TORTOLLAN_WORLD_QUEST:
+    case QUEST_INFO_FACTION_ASSAULT_WORLD_QUEST:
+    case QUEST_INFO_FACTION_ASSAULT_ELITE_WORLD_QUEST:
+        return true;
+    default:
+        break;
+    }
+
+    return HasFlagEx(QUEST_FLAGS_EX_IS_WORLD_QUEST);
 }
 
 bool Quest::IsAllowedInRaid(Difficulty difficulty) const
@@ -480,13 +529,13 @@ WorldPacket Quest::BuildQueryData(LocaleConstant loc) const
     {
         if (QuestTemplateLocale const* questTemplateLocale = sObjectMgr->GetQuestLocale(GetQuestId()))
         {
-            ObjectMgr::GetLocaleString(questTemplateLocale->LogTitle,           loc, response.Info.LogTitle);
-            ObjectMgr::GetLocaleString(questTemplateLocale->LogDescription,     loc, response.Info.LogDescription);
-            ObjectMgr::GetLocaleString(questTemplateLocale->QuestDescription,   loc, response.Info.QuestDescription);
-            ObjectMgr::GetLocaleString(questTemplateLocale->AreaDescription,    loc, response.Info.AreaDescription);
+            ObjectMgr::GetLocaleString(questTemplateLocale->LogTitle, loc, response.Info.LogTitle);
+            ObjectMgr::GetLocaleString(questTemplateLocale->LogDescription, loc, response.Info.LogDescription);
+            ObjectMgr::GetLocaleString(questTemplateLocale->QuestDescription, loc, response.Info.QuestDescription);
+            ObjectMgr::GetLocaleString(questTemplateLocale->AreaDescription, loc, response.Info.AreaDescription);
             ObjectMgr::GetLocaleString(questTemplateLocale->QuestCompletionLog, loc, response.Info.QuestCompletionLog);
-            ObjectMgr::GetLocaleString(questTemplateLocale->PortraitGiverText,  loc, response.Info.PortraitGiverText);
-            ObjectMgr::GetLocaleString(questTemplateLocale->PortraitGiverName,  loc, response.Info.PortraitGiverName);
+            ObjectMgr::GetLocaleString(questTemplateLocale->PortraitGiverText, loc, response.Info.PortraitGiverText);
+            ObjectMgr::GetLocaleString(questTemplateLocale->PortraitGiverName, loc, response.Info.PortraitGiverName);
             ObjectMgr::GetLocaleString(questTemplateLocale->PortraitTurnInText, loc, response.Info.PortraitTurnInText);
             ObjectMgr::GetLocaleString(questTemplateLocale->PortraitTurnInName, loc, response.Info.PortraitTurnInName);
         }
@@ -601,11 +650,11 @@ WorldPacket Quest::BuildQueryData(LocaleConstant loc) const
 uint32 Quest::RoundXPValue(uint32 xp)
 {
     if (xp <= 100)
-        return 5 * ((xp + 2) / 5);
+        return round(5 * ((xp + 2) / 5));
     else if (xp <= 500)
-        return 10 * ((xp + 5) / 10);
+        return round(10 * ((xp + 5) / 10));
     else if (xp <= 1000)
-        return 25 * ((xp + 12) / 25);
+        return round(25 * ((xp + 12) / 25));
     else
-        return 50 * ((xp + 25) / 50);
+        return round(50 * ((xp + 25) / 50));
 }

@@ -366,9 +366,9 @@ static bool IsEncounterFinished(Unit* who)
         vx001->GetStandState() == UNIT_STAND_STATE_DEAD &&
         aerial->GetStandState() == UNIT_STAND_STATE_DEAD)
     {
-        Unit::Kill(who, mkii);
-        Unit::Kill(who, vx001);
-        Unit::Kill(who, aerial);
+        who->Kill(mkii);
+        who->Kill(vx001);
+        who->Kill(aerial);
         mkii->DespawnOrUnsummon(120000);
         vx001->DespawnOrUnsummon(120000);
         aerial->DespawnOrUnsummon(120000);
@@ -437,7 +437,7 @@ class boss_mimiron : public CreatureScript
                 events.ScheduleEvent(EVENT_INTRO_1, 1500);
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* /*who*/) override
             {
                 instance->SetBossState(BOSS_MIMIRON, DONE);
                 events.Reset();
@@ -716,8 +716,7 @@ class boss_leviathan_mk_ii : public CreatureScript
                     {
                         me->SetStandState(UNIT_STAND_STATE_DEAD);
 
-                        Unit* ref = who ? who : me;
-                        if (IsEncounterFinished(ref))
+                        if (IsEncounterFinished(who))
                             return;
 
                         me->CastStop();
@@ -961,8 +960,7 @@ class boss_vx_001 : public CreatureScript
                         me->SetStandState(UNIT_STAND_STATE_DEAD);
                         me->AddUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
 
-                        Unit* ref = who ? who : me;
-                        if (IsEncounterFinished(ref))
+                        if (IsEncounterFinished(who))
                             return;
 
                         me->CastStop();
@@ -1141,8 +1139,7 @@ class boss_aerial_command_unit : public CreatureScript
                     {
                         me->SetStandState(UNIT_STAND_STATE_DEAD);
 
-                        Unit* ref = who ? who : me;
-                        if (IsEncounterFinished(ref))
+                        if (IsEncounterFinished(who))
                             return;
 
                         me->CastStop();

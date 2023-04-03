@@ -301,7 +301,7 @@ class boss_halion : public CreatureScript
                 if (events.IsInPhase(PHASE_THREE))
                 {
                     // Don't consider copied damage.
-                    if (!attacker || !me->IsInPhase(attacker))
+                    if (!me->IsInPhase(attacker))
                         return;
 
                     if (Creature* controller = instance->GetCreature(DATA_HALION_CONTROLLER))
@@ -320,13 +320,10 @@ class boss_halion : public CreatureScript
                 if (events.IsInPhase(PHASE_TWO))
                     return;
 
-                if (!UpdateVictim())
+                if (!UpdateVictim() || me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
                 events.Update(diff);
-
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
 
                 while (uint32 eventId = events.ExecuteEvent())
                 {
@@ -455,7 +452,7 @@ class boss_twilight_halion : public CreatureScript
                         halion->LowerPlayerDamageReq(halion->GetMaxHealth());
 
                     if (halion->IsAlive())
-                        Unit::Kill(killer, halion);
+                        killer->Kill(halion);
                 }
 
                 if (Creature* controller = instance->GetCreature(DATA_HALION_CONTROLLER))
@@ -485,7 +482,7 @@ class boss_twilight_halion : public CreatureScript
                 if (events.IsInPhase(PHASE_THREE))
                 {
                     // Don't consider copied damage.
-                    if (!attacker || !me->IsInPhase(attacker))
+                    if (!me->IsInPhase(attacker))
                         return;
 
                     if (Creature* controller = instance->GetCreature(DATA_HALION_CONTROLLER))
@@ -925,6 +922,13 @@ class npc_orb_carrier : public CreatureScript
                     me->CastSpell(nullptr, SPELL_TRACK_ROTATION, false);
 
                 scheduler.Update(diff);
+
+                /// Workaround: This is here because even though the above spell has SPELL_ATTR1_CHANNEL_TRACK_TARGET,
+                /// we are having two creatures involded here. This attribute is handled clientside, meaning the client
+                /// sends orientation update itself. Here, no packet is sent, and the creature does not rotate. By
+                /// forcing the carrier to always be facing the rotation focus, we ensure everything works as it should.
+                if (Creature* rotationFocus = _instance->GetCreature(DATA_ORB_ROTATION_FOCUS))
+                    me->SetFacingToObject(rotationFocus); // setInFront
             }
 
             void DoAction(int32 action) override
@@ -1240,13 +1244,13 @@ class npc_combustion_consumption : public CreatureScript
                     return;
 
                 CastSpellExtraArgs args;
-                args.AddSpellMod(SPELLVALUE_AURA_STACK, stackAmount + 1);
+                args.SpellValueOverrides.AddMod(SPELLVALUE_AURA_STACK, stackAmount + 1);
                 me->CastSpell(me, SPELL_SCALE_AURA, args);
                 DoCastSelf(_damageSpell);
 
                 int32 damage = 1200 + (stackAmount * 1290); // Needs more research.
                 CastSpellExtraArgs args2;
-                args2.AddSpellMod(SPELLVALUE_BASE_POINT0, damage);
+                args2.SpellValueOverrides.AddMod(SPELLVALUE_BASE_POINT0, damage);
                 summoner->CastSpell(summoner, _explosionSpell, args2);
             }
 
@@ -1276,7 +1280,7 @@ class npc_living_inferno : public CreatureScript
 
             void IsSummonedBy(Unit* /*summoner*/) override
             {
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
                 me->CastSpell(me, SPELL_BLAZING_AURA, true);
 
                 // SMSG_SPELL_GO for the living ember stuff isn't even sent to the client - Blizzard on drugs.
@@ -1514,7 +1518,7 @@ class spell_halion_combustion_consumption_periodic : public SpellScriptLoader
 
                 CastSpellExtraArgs args(aurEff);
                 args.OriginalCaster = caster->GetGUID();
-                args.AddSpellMod(SPELLVALUE_RADIUS_MOD, radius);
+                args.SpellValueOverrides.AddMod(SPELLVALUE_RADIUS_MOD, radius);
                 caster->CastSpell(nullptr, triggerSpell, args);
             }
 
@@ -1568,7 +1572,7 @@ class spell_halion_marks : public SpellScriptLoader
 
                 // Stacks marker
                 CastSpellExtraArgs args(GetCasterGUID());
-                args.AddSpellMod(SPELLVALUE_BASE_POINT1, aurEff->GetBase()->GetStackAmount());
+                args.SpellValueOverrides.AddMod(SPELLVALUE_BASE_POINT1, aurEff->GetBase()->GetStackAmount());
                 GetTarget()->CastSpell(GetTarget(), _summonSpellId, args);
             }
 

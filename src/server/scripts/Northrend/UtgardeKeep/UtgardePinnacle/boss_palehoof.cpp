@@ -117,7 +117,7 @@ public:
     {
         _owner->SetReactState(REACT_AGGRESSIVE);
         _owner->SetTempSummonType(TEMPSUMMON_CORPSE_DESPAWN);
-        _owner->AI()->DoZoneInCombat();
+        _owner->SetInCombatWithZone();
         return true;
     }
 

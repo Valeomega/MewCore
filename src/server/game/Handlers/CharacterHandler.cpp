@@ -24,6 +24,7 @@
 #include "AuthenticationPackets.h"
 #include "Battleground.h"
 #include "BattlegroundPackets.h"
+#include "BattlePayMgr.h"
 #include "BattlePetPackets.h"
 #include "CalendarMgr.h"
 #include "CharacterCache.h"
@@ -61,6 +62,7 @@
 #include "ScriptMgr.h"
 #include "SocialMgr.h"
 #include "SystemPackets.h"
+#include "Transport.h"
 #include "Util.h"
 #include "World.h"
 #include <sstream>
@@ -313,6 +315,10 @@ bool LoginQueryHolder::Initialize()
     stmt->setUInt64(0, lowGuid);
     res &= SetPreparedQuery(PLAYER_LOGIN_QUERY_LOAD_GARRISON_FOLLOWER_ABILITIES, stmt);
 
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_PETBATTLE_ACCOUNT);
+    stmt->setUInt64(0, m_accountId);
+    res &= SetPreparedQuery(PLAYER_LOGIN_QUERY_BATTLE_PETS, stmt);
+
     return res;
 }
 
@@ -431,13 +437,14 @@ void WorldSession::HandleCharEnum(CharacterDatabaseQueryHolder* holder)
         while (result->NextRow());
     }
 
-    charEnum.IsAlliedRacesCreationAllowed = CanAccessAlliedRaces();
+    charEnum.IsAlliedRacesCreationAllowed = GetAccountExpansion() >= EXPANSION_BATTLE_FOR_AZEROTH;
 
     for (std::pair<uint8 const, RaceUnlockRequirement> const& requirement : sObjectMgr->GetRaceUnlockRequirements())
     {
         WorldPackets::Character::EnumCharactersResult::RaceUnlock raceUnlock;
         raceUnlock.RaceID = requirement.first;
         raceUnlock.HasExpansion = GetAccountExpansion() >= requirement.second.Expansion;
+        raceUnlock.HasAchievement = requirement.second.AchievementId == 0;
         charEnum.RaceUnlockData.push_back(raceUnlock);
     }
 
@@ -1107,18 +1114,75 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         pCurrChar->SetGuildLevel(0);
     }
 
-    // TODO: Move this to BattlePetMgr::SendJournalLock() just to have all packets in one file
-    WorldPackets::BattlePet::BattlePetJournalLockAcquired lock;
-    SendPacket(lock.Write());
-
     pCurrChar->SendInitialPacketsBeforeAddToMap();
 
     //Show cinematic at the first time that player login
+    ObjectGuid guidLow;
+    Transport* gobTransport;
     if (!pCurrChar->getCinematic())
     {
         pCurrChar->setCinematic(1);
 
-        if (ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(pCurrChar->getClass()))
+        if (pCurrChar->GetMapId() == 2175)
+        {
+
+            if (pCurrChar->GetTeam() == ALLIANCE)
+            {
+                guidLow = ObjectGuid::Create<HighGuid::Transport>(35);
+                gobTransport = HashMapHolder<Transport>::Find(guidLow);
+                if (gobTransport)
+                {
+                    //pCurrChar->GetSceneMgr().PlayScene(2578);
+                    pCurrChar->GetScheduler().Schedule(Milliseconds(uint32(100)), [pCurrChar, gobTransport](TaskContext context)
+                        {
+                            float x, y, z, o;
+                            x = 10.20483f;
+                            y = 0.15744f;
+                            z = 5.2246f;
+                            o = 3.15951f;
+                            pCurrChar->GetSceneMgr().PlaySceneByPackageId(2578, SCENEFLAG_UNK16);
+
+                            pCurrChar->m_movementInfo.transport.pos.Relocate(x, y, z, o);
+                            gobTransport->CalculatePassengerPosition(x, y, z, &o);
+                            pCurrChar->Relocate(x, y, z, o);
+                            gobTransport->AddPassenger(pCurrChar);
+                            pCurrChar->TeleportTo(pCurrChar->GetMapId(), pCurrChar->GetPositionX(), pCurrChar->GetPositionY(), pCurrChar->GetPositionZ(), pCurrChar->GetOrientation(), TeleportToOptions::TELE_TO_SEAMLESS | TeleportToOptions::TELE_TO_NOT_LEAVE_TRANSPORT);
+
+                        });
+
+                }
+
+            }
+
+            else
+            {
+
+                guidLow = ObjectGuid::Create<HighGuid::Transport>(36);
+                gobTransport = HashMapHolder<Transport>::Find(guidLow);
+                if (gobTransport)
+                {
+                    //pCurrChar->GetSceneMgr().PlayScene(2578);
+                    pCurrChar->GetScheduler().Schedule(Milliseconds(uint32(100)), [pCurrChar, gobTransport](TaskContext context)
+                        {
+                            float x, y, z, o;
+                            x = -7.76472f;
+                            y = 0.235729f;
+                            z = 8.906436f;
+                            o = 3.120459f;
+                            pCurrChar->GetSceneMgr().PlaySceneByPackageId(2894, SCENEFLAG_UNK16);
+
+                            pCurrChar->m_movementInfo.transport.pos.Relocate(x, y, z, o);
+                            gobTransport->CalculatePassengerPosition(x, y, z, &o);
+                            pCurrChar->Relocate(x, y, z, o);
+                            gobTransport->AddPassenger(pCurrChar);
+                            pCurrChar->TeleportTo(pCurrChar->GetMapId(), pCurrChar->GetPositionX(), pCurrChar->GetPositionY(), pCurrChar->GetPositionZ(), pCurrChar->GetOrientation(), TeleportToOptions::TELE_TO_SEAMLESS | TeleportToOptions::TELE_TO_NOT_LEAVE_TRANSPORT);
+
+                        });
+                }
+            }
+
+        }
+        else if (ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(pCurrChar->getClass()))
         {
             if (pCurrChar->getClass() == CLASS_DEMON_HUNTER) /// @todo: find a more generic solution
                 pCurrChar->SendMovieStart(469);
@@ -1131,6 +1195,31 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
             if (!sWorld->GetNewCharString().empty())
                 chH.PSendSysMessage("%s", sWorld->GetNewCharString().c_str());
         }
+    }
+
+    else if (!pCurrChar->getCinematic() && pCurrChar->GetMapId() == MAP_NPE) // Exile's Reach
+    {
+        pCurrChar->setCinematic(1);
+
+        switch (pCurrChar->GetTeam())
+        {
+        case ALLIANCE:
+            pCurrChar->GetScheduler().Schedule(1s, [pCurrChar](TaskContext /*context*/)
+            {
+                pCurrChar->GetSceneMgr().PlaySceneByPackageId(2578);
+            });
+            break;
+
+        case HORDE:
+            pCurrChar->GetScheduler().Schedule(1s, [pCurrChar](TaskContext /*context*/)
+            {
+                pCurrChar->GetSceneMgr().PlaySceneByPackageId(2894);
+            });
+            break;
+        }
+
+        if (!sWorld->GetNewCharString().empty())
+            chH.PSendSysMessage("%s", sWorld->GetNewCharString().c_str());
     }
 
     if (!pCurrChar->GetMap()->AddPlayerToMap(pCurrChar))
@@ -1412,6 +1501,8 @@ void WorldSession::SendFeatureSystemStatus()
 
     features.CharUndeleteEnabled = sWorld->getBoolConfig(CONFIG_FEATURE_SYSTEM_CHARACTER_UNDELETE_ENABLED);
     features.BpayStoreEnabled = sWorld->getBoolConfig(CONFIG_FEATURE_SYSTEM_BPAY_STORE_ENABLED);
+    features.BpayStoreEnabled = GetBattlePayMgr()->IsAvailable();
+    features.BpayStoreAvailable = GetBattlePayMgr()->IsAvailable();
     features.IsMuted = !CanSpeak();
 
     SendPacket(features.Write());
@@ -1987,6 +2078,10 @@ void WorldSession::HandleUseEquipmentSet(WorldPackets::EquipmentSet::UseEquipmen
     SendPacket(result.Write());
 }
 
+void WorldSession::HandleAssignEquipmentSetSpec(WorldPackets::EquipmentSet::AssignEquipmentSetSpec& packet)
+{
+}
+
 void WorldSession::HandleCharRaceOrFactionChangeOpcode(WorldPackets::Character::CharRaceOrFactionChange& packet)
 {
     if (!IsLegitCharacterForAccount(packet.RaceOrFactionChangeInfo->Guid))
@@ -2143,8 +2238,7 @@ void WorldSession::HandleCharRaceOrFactionChangeCallback(std::shared_ptr<WorldPa
     {
         stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_RACE);
         stmt->setUInt8(0, factionChangeInfo->RaceID);
-        stmt->setUInt16(1, PLAYER_EXTRA_HAS_RACE_CHANGED);
-        stmt->setUInt64(2, lowGuid);
+        stmt->setUInt64(1, lowGuid);
 
         trans->Append(stmt);
     }
@@ -2187,6 +2281,7 @@ void WorldSession::HandleCharRaceOrFactionChangeCallback(std::shared_ptr<WorldPa
                 case RACE_LIGHTFORGED_DRAENEI:
                     stmt->setUInt16(1, 759);
                     break;
+                case RACE_MECHAGNOME:
                 case RACE_GNOME:
                     stmt->setUInt16(1, 313);
                     break;
@@ -2203,6 +2298,7 @@ void WorldSession::HandleCharRaceOrFactionChangeCallback(std::shared_ptr<WorldPa
                 case RACE_HIGHMOUNTAIN_TAUREN:
                     stmt->setUInt16(1, 115);
                     break;
+                case RACE_ZANDALARI_TROLL:
                 case RACE_TROLL:
                     stmt->setUInt16(1, 315);
                     break;
@@ -2287,7 +2383,7 @@ void WorldSession::HandleCharRaceOrFactionChangeCallback(std::shared_ptr<WorldPa
             if (newTeamId == TEAM_ALLIANCE)
             {
                 loc.WorldRelocate(0, -8867.68f, 673.373f, 97.9034f, 0.0f);
-                zoneId = 1519;
+                zoneId = ZONE_STORMWIND_CITY;
             }
             else
             {
@@ -2365,15 +2461,16 @@ void WorldSession::HandleCharRaceOrFactionChangeCallback(std::shared_ptr<WorldPa
 
             // Disable all old-faction specific quests
             {
-                ObjectMgr::QuestContainer const& questTemplates = sObjectMgr->GetQuestTemplates();
-                for (auto const& questTemplatePair : questTemplates)
+                ObjectMgr::QuestMap const& questTemplates = sObjectMgr->GetQuestTemplates();
+                for (ObjectMgr::QuestMap::const_iterator iter = questTemplates.begin(); iter != questTemplates.end(); ++iter)
                 {
+                    Quest const* quest = iter->second;
                     uint64 newRaceMask = (newTeamId == TEAM_ALLIANCE) ? RACEMASK_ALLIANCE : RACEMASK_HORDE;
-                    if (questTemplatePair.second.GetAllowableRaces().RawValue != uint64(-1) && !(questTemplatePair.second.GetAllowableRaces().RawValue & newRaceMask))
+                    if (quest->GetAllowableRaces().RawValue != uint64(-1) && !(quest->GetAllowableRaces().RawValue & newRaceMask))
                     {
                         stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_QUESTSTATUS_REWARDED_ACTIVE_BY_QUEST);
                         stmt->setUInt64(0, lowGuid);
-                        stmt->setUInt32(1, questTemplatePair.first);
+                        stmt->setUInt32(1, quest->GetQuestId());
                         trans->Append(stmt);
                     }
                 }
@@ -2551,6 +2648,57 @@ void WorldSession::HandleReorderCharacters(WorldPackets::Character::ReorderChara
 
     CharacterDatabase.CommitTransaction(trans);
 }
+
+void WorldSession::HandleEngineSurvey(WorldPackets::Character::EngineSurvey& packet)
+{
+    std::hash<std::string> hash_gen;
+    std::string baseData(
+        "TotalPhysMemory:" + std::to_string(packet.TotalPhysMemory) +
+        "GPUVideoMemory:" + std::to_string(packet.GPUVideoMemory) +
+        "GPUSystemMemory:" + std::to_string(packet.GPUSystemMemory) +
+        "GPUSharedMemory:" + std::to_string(packet.GPUSharedMemory) +
+        "GPUVendorID:" + std::to_string(packet.GPUVendorID) +
+        "GPUModelID:" + std::to_string(packet.GPUModelID) +
+        "ProcessorUnkUnk:" + std::to_string(packet.ProcessorUnkUnk) +
+        "ProcessorFeatures:" + std::to_string(packet.ProcessorFeatures) +
+        "ProcessorVendor:" + std::to_string(packet.ProcessorVendor) +
+        "ProcessorNumberOfProcessors:" + std::to_string(packet.ProcessorNumberOfProcessors) +
+        "ProcessorNumberOfThreads:" + std::to_string(packet.ProcessorNumberOfThreads) +
+        "SystemOSIndex:" + std::to_string(packet.SystemOSIndex) +
+        "Is64BitSystem:" + std::to_string(packet.Is64BitSystem)
+    );
+
+    /*  auto str_hash = hash_gen(baseData);
+      if (_hwid == str_hash) // Not need update
+          return;
+
+      _hwid = str_hash;
+
+      LoginDatabase.PExecute("UPDATE account SET hwid = " UI64FMTD " WHERE id = %u;", _hwid, GetAccountId());
+
+      if (!_hwid)
+          return;
+
+      if (auto result = LoginDatabase.PQuery("SELECT penalties, last_reason from hwid_penalties where hwid = " UI64FMTD, _hwid))
+      {
+          auto fields = result->Fetch();
+          _countPenaltiesHwid = fields[0].GetInt32();
+
+          if ((sWorld->getIntConfig(CONFIG_ANTI_FLOOD_HWID_BANS_COUNT) && _countPenaltiesHwid >= sWorld->getIntConfig(CONFIG_ANTI_FLOOD_HWID_BANS_COUNT)) || _countPenaltiesHwid < 0)
+          {
+              std::stringstream ss;
+              ss << (fields[1].GetString().empty() ? "Antiflood unknwn" : fields[1].GetCString()) << "*";
+
+              if (sWorld->getBoolConfig(CONFIG_ANTI_FLOOD_HWID_BANS_ALLOW))
+                  sWorld->BanAccount(BAN_ACCOUNT, GetAccountName(), "-1", ss.str(), "Server");
+              else if (sWorld->getBoolConfig(CONFIG_ANTI_FLOOD_HWID_MUTE_ALLOW))
+                  sWorld->MuteAccount(GetAccountId(), -1, ss.str(), "Server", this);
+              else if (sWorld->getBoolConfig(CONFIG_ANTI_FLOOD_HWID_KICK_ALLOW))
+                  KickPlayer();
+          }*/
+          //}
+}
+
 
 void WorldSession::HandleOpeningCinematic(WorldPackets::Misc::OpeningCinematic& /*packet*/)
 {

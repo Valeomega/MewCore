@@ -1,5 +1,5 @@
 /*
- * This file is part of the TrinityCore Project. See AUTHORS file for Copyright information
+ * Copyright (C) 2020 LatinCoreTeam
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -21,11 +21,9 @@
 #include "Define.h"
 #include "SmartScriptMgr.h"
 
-class AreaTrigger;
 class Creature;
 class GameObject;
 class Player;
-class Quest;
 class SpellInfo;
 class Unit;
 class WorldObject;
@@ -34,106 +32,115 @@ struct SceneTemplate;
 
 class TC_GAME_API SmartScript
 {
-    public:
-        SmartScript();
-        ~SmartScript();
+public:
+    SmartScript();
+    ~SmartScript();
 
-        void OnInitialize(WorldObject* obj, AreaTriggerEntry const* at = nullptr, SceneTemplate const* scene = nullptr, Quest const* qst = nullptr);
-        void GetScript();
-        void FillScript(SmartAIEventList e, WorldObject* obj, AreaTriggerEntry const* at, SceneTemplate const* scene, Quest const* quest);
+    void OnInitialize(WorldObject* obj, AreaTriggerEntry const* at = nullptr, SceneTemplate const* scene = nullptr);
+    void GetScript();
+    void FillScript(SmartAIEventList e, WorldObject* obj, AreaTriggerEntry const* at, SceneTemplate const* scene);
 
-        void ProcessEventsFor(SMART_EVENT e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, SpellInfo const* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
-        void ProcessEvent(SmartScriptHolder& e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, SpellInfo const* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
-        bool CheckTimer(SmartScriptHolder const& e) const;
-        static void RecalcTimer(SmartScriptHolder& e, uint32 min, uint32 max);
-        void UpdateTimer(SmartScriptHolder& e, uint32 const diff);
-        static void InitTimer(SmartScriptHolder& e);
-        void ProcessAction(SmartScriptHolder& e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, SpellInfo const* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
-        void ProcessTimedAction(SmartScriptHolder& e, uint32 const& min, uint32 const& max, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, SpellInfo const* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
-        void GetTargets(ObjectVector& targets, SmartScriptHolder const& e, Unit* invoker = nullptr) const;
-        void GetWorldObjectsInDist(ObjectVector& objects, float dist) const;
-        void InstallTemplate(SmartScriptHolder const& e);
-        static SmartScriptHolder CreateSmartEvent(SMART_EVENT e, uint32 event_flags, uint32 event_param1, uint32 event_param2, uint32 event_param3, uint32 event_param4, uint32 event_param5, SMART_ACTION action, uint32 action_param1, uint32 action_param2, uint32 action_param3, uint32 action_param4, uint32 action_param5, uint32 action_param6, SMARTAI_TARGETS t, uint32 target_param1, uint32 target_param2, uint32 target_param3, uint32 phaseMask = 0);
-        void AddEvent(SMART_EVENT e, uint32 event_flags, uint32 event_param1, uint32 event_param2, uint32 event_param3, uint32 event_param4, uint32 event_param5, SMART_ACTION action, uint32 action_param1, uint32 action_param2, uint32 action_param3, uint32 action_param4, uint32 action_param5, uint32 action_param6, SMARTAI_TARGETS t, uint32 target_param1, uint32 target_param2, uint32 target_param3, uint32 phaseMask = 0);
-        void SetPathId(uint32 id) { mPathId = id; }
-        uint32 GetPathId() const { return mPathId; }
-        WorldObject* GetBaseObject() const;
-        WorldObject* GetBaseObjectOrUnit(Unit* unit);
-        static bool IsUnit(WorldObject* obj);
-        static bool IsPlayer(WorldObject* obj);
-        static bool IsCreature(WorldObject* obj);
-        static bool IsCharmedCreature(WorldObject* obj);
-        static bool IsGameObject(WorldObject* obj);
+    void ProcessEventsFor(SMART_EVENT e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
+    void ProcessEvent(SmartScriptHolder& e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
+    bool CheckTimer(SmartScriptHolder const& e) const;
+    void RecalcTimer(SmartScriptHolder& e, uint32 min, uint32 max);
+    void UpdateTimer(SmartScriptHolder& e, uint32 const diff);
+    void InitTimer(SmartScriptHolder& e);
+    void ProcessAction(SmartScriptHolder& e, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
+    void ProcessTimedAction(SmartScriptHolder& e, uint32 const& min, uint32 const& max, Unit* unit = nullptr, uint32 var0 = 0, uint32 var1 = 0, bool bvar = false, const SpellInfo* spell = nullptr, GameObject* gob = nullptr, std::string const& varString = "");
+    ObjectList* GetTargets(SmartScriptHolder const& e, Unit* invoker = nullptr);
+    ObjectList* GetWorldObjectsInDist(float dist);
+    void InstallTemplate(SmartScriptHolder const& e);
+    SmartScriptHolder CreateSmartEvent(SMART_EVENT e, uint32 event_flags, uint32 event_param1, uint32 event_param2, uint32 event_param3, uint32 event_param4, uint32 event_param5, SMART_ACTION action, uint32 action_param1, uint32 action_param2, uint32 action_param3, uint32 action_param4, uint32 action_param5, uint32 action_param6, SMARTAI_TARGETS t, uint32 target_param1, uint32 target_param2, uint32 target_param3, uint32 phaseMask = 0);
+    void AddEvent(SMART_EVENT e, uint32 event_flags, uint32 event_param1, uint32 event_param2, uint32 event_param3, uint32 event_param4, uint32 event_param5, SMART_ACTION action, uint32 action_param1, uint32 action_param2, uint32 action_param3, uint32 action_param4, uint32 action_param5, uint32 action_param6, SMARTAI_TARGETS t, uint32 target_param1, uint32 target_param2, uint32 target_param3, uint32 phaseMask = 0);
+    void SetPathId(uint32 id) { mPathId = id; }
+    uint32 GetPathId() const { return mPathId; }
 
-        void OnUpdate(const uint32 diff);
-        void OnMoveInLineOfSight(Unit* who);
+    WorldObject* GetBaseObject();
+    WorldObject* GetBaseObjectOrUnit(Unit* unit);
+    static bool IsUnit(WorldObject* obj);
+    static bool IsPlayer(WorldObject* obj);
+    static bool IsCreature(WorldObject* obj);
+    static bool IsCharmedCreature(WorldObject* obj);
+    static bool IsGameObject(WorldObject* obj);
 
-        Unit* DoSelectLowestHpFriendly(float range, uint32 MinHPDiff) const;
-        void DoFindFriendlyCC(std::vector<Creature*>& creatures, float range) const;
-        void DoFindFriendlyMissingBuff(std::vector<Creature*>& creatures, float range, uint32 spellid) const;
-        Unit* DoFindClosestFriendlyInRange(float range, bool playerOnly) const;
+    void OnUpdate(const uint32 diff);
+    void OnMoveInLineOfSight(Unit* who);
 
-        bool IsSmart(Creature* c, bool silent = false);
-        bool IsSmart(GameObject* g, bool silent = false);
-        bool IsSmart(bool silent = false);
+    Unit* DoSelectLowestHpFriendly(float range, uint32 MinHPDiff);
+    void DoFindFriendlyCC(std::list<Creature*>& _list, float range);
+    void DoFindFriendlyMissingBuff(std::list<Creature*>& list, float range, uint32 spellid);
+    Unit* DoFindClosestFriendlyInRange(float range, bool playerOnly);
 
-        void StoreTargetList(ObjectVector const& targets, uint32 id);
-        ObjectVector const* GetStoredTargetVector(uint32 id, WorldObject const& ref) const;
+    bool IsSmart(Creature* c = nullptr);
+    bool IsSmartGO(GameObject* g = nullptr);
 
-        void StoreCounter(uint32 id, uint32 value, uint32 reset);
-        uint32 GetCounterValue(uint32 id) const;
+    void StoreTargetList(ObjectList* targets, uint32 id);
+    ObjectList* GetTargetList(uint32 id);
 
-        GameObject* FindGameObjectNear(WorldObject* searchObject, ObjectGuid::LowType guid) const;
-        Creature* FindCreatureNear(WorldObject* searchObject, ObjectGuid::LowType guid) const;
+    void StoreCounter(uint32 id, uint32 value, uint32 reset);
+    uint32 GetCounterValue(uint32 id) const;
 
-        void OnReset();
-        void ResetBaseObject();
+    GameObject* FindGameObjectNear(WorldObject* searchObject, ObjectGuid::LowType guid) const;
+    Creature* FindCreatureNear(WorldObject* searchObject, ObjectGuid::LowType guid) const;
 
-        void SetTimedActionList(SmartScriptHolder& e, uint32 entry, Unit* invoker);
-        Unit* GetLastInvoker(Unit* invoker = nullptr) const;
-        ObjectGuid mLastInvoker;
-        typedef std::unordered_map<uint32, uint32> CounterMap;
-        CounterMap mCounterList;
+    ObjectListMap* mTargetStorage;
 
-    private:
+    void OnReset();
+    void ResetBaseObject();
 
-        void IncPhase(uint32 p);
-        void DecPhase(uint32 p);
+    //TIMED_ACTIONLIST (script type 9 aka script9)
+    void SetScript9(SmartScriptHolder& e, uint32 entry);
+    Unit* GetLastInvoker(Unit* invoker = nullptr);
+    ObjectGuid mLastInvoker;
+    typedef std::unordered_map<uint32, uint32> CounterMap;
+    CounterMap mCounterList;
 
-        void SetPhase(uint32 p);
-        bool IsInPhase(uint32 p) const;
+private:
+    void IncPhase(uint32 p);
+    void DecPhase(uint32 p)
+    {
+        if (p >= mEventPhase)
+            mEventPhase = 0;
+        else
+            mEventPhase -= p;
+    }
 
-        SmartAIEventList mEvents;
-        SmartAIEventList mInstallEvents;
-        SmartAIEventList mTimedActionList;
-        ObjectGuid mTimedActionListInvoker;
-        bool isProcessingTimedActionList;
-        Creature* me;
-        ObjectGuid meOrigGUID;
-        GameObject* go;
-        ObjectGuid goOrigGUID;
-        AreaTriggerEntry const* trigger;
-        AreaTrigger* areaTrigger;
-        SceneTemplate const* sceneTemplate;
-        Quest const* quest;
-        SmartScriptType mScriptType;
-        uint32 mEventPhase;
+    bool IsInPhase(uint32 p) const
+    {
+        if (mEventPhase == 0)
+            return false;
+        return ((1 << (mEventPhase - 1)) & p) != 0;
+    }
 
-        uint32 mPathId;
-        SmartAIEventStoredList mStoredEvents;
-        std::vector<uint32> mRemIDs;
+    void SetPhase(uint32 p = 0) { mEventPhase = p; }
 
-        uint32 mTextTimer;
-        uint32 mLastTextID;
-        uint32 mTalkerEntry;
-        bool mUseTextTimer;
+    SmartAIEventList mEvents;
+    SmartAIEventList mInstallEvents;
+    SmartAIEventList mTimedActionList;
+    bool isProcessingTimedActionList;
+    Creature* me;
+    ObjectGuid meOrigGUID;
+    GameObject* go;
+    ObjectGuid goOrigGUID;
+    AreaTriggerEntry const* trigger;
+    SceneTemplate const* sceneTemplate;
+    SmartScriptType mScriptType;
+    uint32 mEventPhase;
 
-        ObjectVectorMap _storedTargets;
+    uint32 mPathId;
+    SmartAIEventStoredList mStoredEvents;
+    std::vector<uint32> mRemIDs;
 
-        SMARTAI_TEMPLATE mTemplate;
-        void InstallEvents();
+    uint32 mTextTimer;
+    uint32 mLastTextID;
+    uint32 mTalkerEntry;
+    bool mUseTextTimer;
 
-        void RemoveStoredEvent(uint32 id);
+    SMARTAI_TEMPLATE mTemplate;
+    void InstallEvents();
+
+    void RemoveStoredEvent(uint32 id);
 };
 
 #endif

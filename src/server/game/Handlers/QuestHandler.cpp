@@ -35,6 +35,7 @@
 #include "ReputationMgr.h"
 #include "ScriptMgr.h"
 #include "World.h"
+#include "WorldQuestMgr.h"
 
 void WorldSession::HandleQuestgiverStatusQueryOpcode(WorldPackets::Quest::QuestGiverStatusQuery& packet)
 {
@@ -92,6 +93,10 @@ void WorldSession::HandleQuestgiverHelloOpcode(WorldPackets::Quest::QuestGiverHe
     creature->SetHomePosition(creature->GetPosition());
 
     _player->PlayerTalkClass->ClearMenus();
+
+    if (sScriptMgr->OnGossipHello(_player, creature))
+        return;
+
     if (creature->AI()->GossipHello(_player))
         return;
 
@@ -485,7 +490,7 @@ void WorldSession::HandleQuestLogRemoveQuest(WorldPackets::Quest::QuestLogRemove
             _player->TakeQuestSourceItem(questId, true); // remove quest src item from player
             _player->AbandonQuest(questId); // remove all quest items player received before abandoning quest. Note, this does not remove normal drop items that happen to be quest requirements.
             _player->RemoveActiveQuest(questId);
-            _player->RemoveCriteriaTimer(CriteriaStartEvent::AcceptQuest, questId);
+            _player->RemoveCriteriaTimer(CRITERIA_TIMED_TYPE_QUEST, questId);
 
             TC_LOG_INFO("network", "%s abandoned quest %u", _player->GetGUID().ToString().c_str(), questId);
 
@@ -768,6 +773,10 @@ void WorldSession::HandlePlayerChoiceResponse(WorldPackets::Quest::ChoiceRespons
         if (playerChoiceResponse->Reward->Xp)
             _player->GiveXP(playerChoiceResponse->Reward->Xp, nullptr, 0.0f);
 
+        if (auto reward = playerChoiceResponse->Reward)
+            if (reward.is_initialized() && reward->SpellID)
+                _player->CastSpell(_player, reward->SpellID, true);
+
         for (PlayerChoiceResponseRewardItem const& item : playerChoiceResponse->Reward->Items)
         {
             ItemPosCountVec dest;
@@ -784,4 +793,19 @@ void WorldSession::HandlePlayerChoiceResponse(WorldPackets::Quest::ChoiceRespons
         for (PlayerChoiceResponseRewardEntry const& faction : playerChoiceResponse->Reward->Faction)
             _player->GetReputationMgr().ModifyReputation(sFactionStore.AssertEntry(faction.Id), faction.Quantity);
     }
+}
+
+void WorldSession::HandleQueryTreasurePicker(WorldPackets::Quest::QueryTreasurePicker& packet)
+{
+    auto quest = sObjectMgr->GetQuestTemplate(packet.QuestID);
+
+    WorldPackets::Quest::QueryQuestRewardResponse response;
+    response.QuestID = packet.QuestID;
+    response.TreasurePickerID = packet.QuestTimer;
+    sWorldQuestMgr->BuildRewardPacket(GetPlayer(), response.QuestID, response);
+    SendPacket(response.Write());
+}
+
+void WorldSession::HandleUiMapQuestLinesRequest(WorldPackets::Quest::UiMapQuestLinesRequest& packet)
+{
 }

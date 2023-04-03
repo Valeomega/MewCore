@@ -136,7 +136,7 @@ public:
             Talk(SAY_ATTACKED, who);
         }
 
-        void JustDied(Unit* /*killer*/) override
+        void JustDied(Unit* /*slayer*/) override
         {
             instance->SetData(TYPE_NARALEX_EVENT, FAIL);
             instance->SetData(TYPE_NARALEX_PART1, FAIL);

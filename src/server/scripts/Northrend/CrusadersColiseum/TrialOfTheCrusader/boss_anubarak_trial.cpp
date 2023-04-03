@@ -310,7 +310,7 @@ class boss_anubarak_trial : public CreatureScript
                         case EVENT_PENETRATING_COLD:
                         {
                             CastSpellExtraArgs args;
-                            args.AddSpellMod(SPELLVALUE_MAX_TARGETS, RAID_MODE(2, 5, 2, 5));
+                            args.SpellValueOverrides.AddMod(SPELLVALUE_MAX_TARGETS, RAID_MODE(2, 5, 2, 5));
                             me->CastSpell(nullptr, SPELL_PENETRATING_COLD, args);
                             events.ScheduleEvent(EVENT_PENETRATING_COLD, 20 * IN_MILLISECONDS, 0, PHASE_MELEE);
                             return;
@@ -319,7 +319,7 @@ class boss_anubarak_trial : public CreatureScript
                             if (IsHeroic() || !_reachedPhase3)
                             {
                                 CastSpellExtraArgs args;
-                                args.AddSpellMod(SPELLVALUE_MAX_TARGETS, RAID_MODE(1, 2, 2, 4));
+                                args.SpellValueOverrides.AddMod(SPELLVALUE_MAX_TARGETS, RAID_MODE(1, 2, 2, 4));
                                 me->CastSpell(nullptr, SPELL_SUMMON_BURROWER, args);
                             }
                             events.ScheduleEvent(EVENT_SUMMON_NERUBIAN, 45*IN_MILLISECONDS, 0, PHASE_MELEE);
@@ -465,7 +465,7 @@ class npc_swarm_scarab : public CreatureScript
                 me->SetCorpseDelay(0);
                 Initialize();
                 DoCast(me, SPELL_ACID_MANDIBLE);
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
                 if (me->IsInCombat())
                     if (Creature* anubarak = _instance->GetCreature(DATA_ANUBARAK))
                         anubarak->AI()->JustSummoned(me);
@@ -486,8 +486,7 @@ class npc_swarm_scarab : public CreatureScript
 
             void JustDied(Unit* killer) override
             {
-                if (killer)
-                    DoCast(killer, SPELL_TRAITOR_KING);
+                DoCast(killer, SPELL_TRAITOR_KING);
             }
 
             void UpdateAI(uint32 diff) override
@@ -546,7 +545,7 @@ class npc_nerubian_burrower : public CreatureScript
                 DoCast(me, SPELL_EXPOSE_WEAKNESS);
                 DoCast(me, SPELL_SPIDER_FRENZY);
                 DoCast(me, SPELL_AWAKENED);
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
                 if (me->IsInCombat())
                     if (Creature* anubarak = _instance->GetCreature(DATA_ANUBARAK))
                         anubarak->AI()->JustSummoned(me);
@@ -709,7 +708,7 @@ class npc_anubarak_spike : public CreatureScript
             {
                 Initialize();
                 // make sure the spike has everyone on threat list
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
             }
 
             bool CanAIAttack(Unit const* victim) const override
@@ -822,7 +821,7 @@ class npc_anubarak_spike : public CreatureScript
                 me->SetSpeedRate(MOVE_RUN, 0.5f);
                 // make sure the Spine will really follow the one he should
                 me->GetThreatManager().ResetAllThreat();
-                DoZoneInCombat();
+                me->SetInCombatWithZone();
                 AddThreat(who, 1000000.0f);
                 me->GetMotionMaster()->Clear(true);
                 me->GetMotionMaster()->MoveChase(who);
@@ -897,7 +896,7 @@ class spell_impale : public SpellScriptLoader
 
                 // make sure Impale doesnt do damage if we are standing on permafrost
                 if (target && target->HasAura(SPELL_PERMAFROST))
-                    PreventHitDamage();
+                    SetHitDamage(0);
             }
 
             void Register() override
@@ -935,7 +934,7 @@ class spell_anubarak_leeching_swarm : public SpellScriptLoader
                     if (lifeLeeched < 250)
                         lifeLeeched = 250;
                     CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
-                    args.AddSpellMod(SPELLVALUE_BASE_POINT0, lifeLeeched);
+                    args.SpellValueOverrides.AddMod(SPELLVALUE_BASE_POINT0, lifeLeeched);
                     // Damage
                     caster->CastSpell(target, SPELL_LEECHING_SWARM_DMG, args);
                     // Heal

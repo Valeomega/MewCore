@@ -126,9 +126,8 @@ public:
             {
                 Damage = 0;
 
-                if (pDoneBy)
-                    if (Player* player = pDoneBy->GetCharmerOrOwnerPlayerOrPlayerItself())
-                        player->GroupEventHappens(QUEST_MISSING_DIPLO_PT16, me);
+                if (Player* player = pDoneBy->GetCharmerOrOwnerPlayerOrPlayerItself())
+                    player->GroupEventHappens(QUEST_MISSING_DIPLO_PT16, me);
 
                 Talk(EMOTE_SURRENDER);
                 EnterEvadeMode();

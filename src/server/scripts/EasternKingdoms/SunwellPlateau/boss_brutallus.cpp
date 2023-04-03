@@ -233,7 +233,7 @@ public:
                     ++IntroPhase;
                     break;
                 case 7:
-                    Unit::Kill(me, Madrigosa);
+                    me->Kill(Madrigosa);
                     Madrigosa->AI()->Talk(YELL_MADR_DEATH);
                     me->SetFullHealth();
                     me->AttackStop();

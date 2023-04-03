@@ -96,45 +96,45 @@ private:
 // please check Game/Combat/CombatManager.h for documentation on how this class works!
 class TC_GAME_API CombatManager
 {
-    public:
-        static bool CanBeginCombat(Unit const* a, Unit const* b);
+public:
+    static bool CanBeginCombat(Unit const* a, Unit const* b);
 
-        CombatManager(Unit* owner) : _owner(owner) { }
-        ~CombatManager();
-        void Update(uint32 tdiff); // called from Unit::Update
+    CombatManager(Unit* owner) : _owner(owner) { }
+    ~CombatManager();
+    void Update(uint32 tdiff); // called from Unit::Update
 
-        Unit* GetOwner() const { return _owner; }
-        bool HasCombat() const { return HasPvECombat() || HasPvPCombat(); }
-        bool HasPvECombat() const { return !_pveRefs.empty(); }
-        std::unordered_map<ObjectGuid, CombatReference*> const& GetPvECombatRefs() const { return _pveRefs; }
-        bool HasPvPCombat() const;
-        std::unordered_map<ObjectGuid, PvPCombatReference*> const& GetPvPCombatRefs() const { return _pvpRefs; }
-        // If the Unit is in combat, returns an arbitrary Unit that it's in combat with. Otherwise, returns nullptr.
-        Unit* GetAnyTarget() const;
+    Unit* GetOwner() const { return _owner; }
+    bool HasCombat() const { return HasPvECombat() || HasPvPCombat(); }
+    bool HasPvECombat() const { return !_pveRefs.empty(); }
+    std::unordered_map<ObjectGuid, CombatReference*> const& GetPvECombatRefs() const { return _pveRefs; }
+    bool HasPvPCombat() const;
+    std::unordered_map<ObjectGuid, PvPCombatReference*> const& GetPvPCombatRefs() const { return _pvpRefs; }
+    // If the Unit is in combat, returns an arbitrary Unit that it's in combat with. Otherwise, returns nullptr.
+    Unit* GetAnyTarget() const;
 
-        // return value is the same as calling IsInCombatWith immediately after this returns
-        bool SetInCombatWith(Unit* who);
-        bool IsInCombatWith(ObjectGuid const& who) const;
-        bool IsInCombatWith(Unit const* who) const;
-        void InheritCombatStatesFrom(Unit const* who);
-        void EndCombatBeyondRange(float range, bool includingPvP = false);
-        // flags any pvp refs for suppression on owner's side - these refs will not generate combat until refreshed
-        void SuppressPvPCombat();
-        void EndAllPvECombat();
-        void EndAllPvPCombat();
-        void EndAllCombat() { EndAllPvECombat(); EndAllPvPCombat(); }
+    // return value is the same as calling IsInCombatWith immediately after this returns
+    bool SetInCombatWith(Unit* who);
+    bool IsInCombatWith(ObjectGuid const& who) const;
+    bool IsInCombatWith(Unit const* who) const;
+    void InheritCombatStatesFrom(Unit const* who);
+    void EndCombatBeyondRange(float range, bool includingPvP = false);
+    // flags any pvp refs for suppression on owner's side - these refs will not generate combat until refreshed
+    void SuppressPvPCombat();
+    void EndAllPvECombat();
+    void EndAllPvPCombat();
+    void EndAllCombat() { EndAllPvECombat(); EndAllPvPCombat(); }
 
-        CombatManager(CombatManager const&) = delete;
-        CombatManager& operator=(CombatManager const&) = delete;
+    CombatManager(CombatManager const&) = delete;
+    CombatManager& operator=(CombatManager const&) = delete;
 
-    private:
-        static void NotifyAICombat(Unit* me, Unit* other);
-        void PutReference(ObjectGuid const& guid, CombatReference* ref);
-        void PurgeReference(ObjectGuid const& guid, bool pvp);
-        bool UpdateOwnerCombatState() const;
-        Unit* const _owner;
-        std::unordered_map<ObjectGuid, CombatReference*> _pveRefs;
-        std::unordered_map<ObjectGuid, PvPCombatReference*> _pvpRefs;
+private:
+    static void NotifyAICombat(Unit* me, Unit* other);
+    void PutReference(ObjectGuid const& guid, CombatReference* ref);
+    void PurgeReference(ObjectGuid const& guid, bool pvp);
+    bool UpdateOwnerCombatState() const;
+    Unit* const _owner;
+    std::unordered_map<ObjectGuid, CombatReference*> _pveRefs;
+    std::unordered_map<ObjectGuid, PvPCombatReference*> _pvpRefs;
 
 
     friend struct CombatReference;

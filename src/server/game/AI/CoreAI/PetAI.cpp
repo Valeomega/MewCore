@@ -16,7 +16,6 @@
  */
 
 #include "PetAI.h"
-#include "AIException.h"
 #include "Creature.h"
 #include "Errors.h"
 #include "Group.h"
@@ -46,8 +45,6 @@ int32 PetAI::Permissible(Creature const* creature)
 
 PetAI::PetAI(Creature* c) : CreatureAI(c), i_tracker(TIME_INTERVAL_LOOK)
 {
-    if (!me->GetCharmInfo())
-        throw InvalidAIException("Creature doesn't have a valid charm info");
     UpdateAllies();
 }
 
@@ -156,7 +153,7 @@ void PetAI::UpdateAI(uint32 diff)
             if (!spellInfo)
                 continue;
 
-            if (me->GetSpellHistory()->HasGlobalCooldown(spellInfo))
+            if (me->GetCharmInfo() && me->GetSpellHistory()->HasGlobalCooldown(spellInfo))
                 continue;
 
             // check spell cooldown

@@ -318,7 +318,7 @@ public:
                 if (damage > 0)
                 {
                     CastSpellExtraArgs args(TRIGGERED_FULL_MASK);
-                    args.AddSpellBP0(damage);
+                    args.SpellValueOverrides.AddBP0(damage);
                     GetCaster()->CastSpell(unit, SPELL_DECIMATE_DMG, args);
                 }
             }

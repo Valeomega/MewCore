@@ -299,27 +299,46 @@ void WorldSession::HandleCastSpellOpcode(WorldPackets::Spells::CastSpell& cast)
         caster = _player;
     }
 
+    // client provided targets
+    SpellCastTargets targets(caster, cast.Cast);
+
+    bool ignoreGoCast = false;
+    if (GameObject* goTarget = targets.GetGOTarget())
+    {
+        if (GameObjectTemplate const* goInfo = goTarget->GetGOInfo())
+        {
+            if (LockEntry const* lockInfo = sLockStore.LookupEntry(goInfo->GetLockId()))
+            {
+                for (int i = 0; i < MAX_LOCK_CASE; ++i)
+                {
+                    if (lockInfo->Type[i] == LOCK_KEY_SPELL)
+                    {
+                        if (lockInfo->Index[i] == spellInfo->Id)
+                        {
+                            ignoreGoCast = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // check known spell or raid marker spell (which not requires player to know it)
-    if (caster->GetTypeId() == TYPEID_PLAYER && !caster->ToPlayer()->HasActiveSpell(spellInfo->Id) && !spellInfo->HasEffect(SPELL_EFFECT_CHANGE_RAID_MARKER) && !spellInfo->HasAttribute(SPELL_ATTR8_RAID_MARKER))
-        return;
+    if (!ignoreGoCast && caster->GetTypeId() == TYPEID_PLAYER && spellInfo->Id != 200749 && !caster->ToPlayer()->HasActiveSpell(spellInfo->Id) && !spellInfo->HasEffect(SPELL_EFFECT_CHANGE_RAID_MARKER) && !spellInfo->HasAttribute(SPELL_ATTR8_RAID_MARKER))
 
     // Check possible spell cast overrides
     spellInfo = caster->GetCastSpellInfo(spellInfo);
 
+    // Client is resending autoshot cast opcode when other spell is cast during shoot rotation
+    // Skip it to prevent "interrupt" message
+    if (spellInfo->IsAutoRepeatRangedSpell() && caster->GetCurrentSpell(CURRENT_AUTOREPEAT_SPELL)
+        && caster->GetCurrentSpell(CURRENT_AUTOREPEAT_SPELL)->m_spellInfo == spellInfo)
+        return;
+
     // can't use our own spells when we're in possession of another unit,
     if (_player->isPossessing())
         return;
-
-    // client provided targets
-    SpellCastTargets targets(caster, cast.Cast);
-
-    // Client is resending autoshot cast opcode when other spell is cast during shoot rotation
-    // Skip it to prevent "interrupt" message
-    // Also check targets! target may have changed and we need to interrupt current spell
-    if (spellInfo->IsAutoRepeatRangedSpell())
-        if (Spell* spell = caster->GetCurrentSpell(CURRENT_AUTOREPEAT_SPELL))
-            if (spell->m_spellInfo == spellInfo && spell->m_targets.GetUnitTargetGUID() == targets.GetUnitTargetGUID())
-                return;
 
     // auto-selection buff level base at target level (in spellInfo)
     if (targets.GetUnitTarget())
@@ -334,7 +353,7 @@ void WorldSession::HandleCastSpellOpcode(WorldPackets::Spells::CastSpell& cast)
     if (cast.Cast.MoveUpdate)
         HandleMovementOpcode(CMSG_MOVE_STOP, *cast.Cast.MoveUpdate);
 
-    Spell* spell = new Spell(caster, spellInfo, TRIGGERED_NONE);
+    Spell* spell = new Spell(caster, spellInfo, TRIGGERED_NONE, ObjectGuid::Empty, false);
 
     WorldPackets::Spells::SpellPrepare spellPrepare;
     spellPrepare.ClientCastID = cast.Cast.CastID;
@@ -607,6 +626,10 @@ void WorldSession::HandleMissileTrajectoryCollision(WorldPackets::Spells::Missil
     notify.CastID = packet.CastID;
     notify.CollisionPos = packet.CollisionPos;
     caster->SendMessageToSet(notify.Write(), true);
+}
+
+void WorldSession::HandleCancelQueuedSpell(WorldPackets::Spells::CancelQueuedSpell& packet)
+{
 }
 
 void WorldSession::HandleUpdateMissileTrajectory(WorldPackets::Spells::UpdateMissileTrajectory& packet)

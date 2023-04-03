@@ -172,3 +172,4 @@ void WorldPackets::GuildFinder::LFGuildSetGuildPost::Read()
     Active = _worldPacket.ReadBit();
     Comment = _worldPacket.ReadString(_worldPacket.ReadBits(10));
 }
+

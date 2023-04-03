@@ -193,7 +193,6 @@ namespace
         SET_GUID_INFO(AIGroup, FormatWorldObject);
         SET_GUID_INFO(DynamicDoor, FormatWorldObject);
         SET_GUID_INFO(ClientActor, FormatClientActor);
-        SET_GUID_INFO(Vignette, FormatWorldObject);
         SET_GUID_INFO(CallForHelp, FormatWorldObject);
         SET_GUID_INFO(AIResource, FormatWorldObject);
         SET_GUID_INFO(AILock, FormatWorldObject);
@@ -217,6 +216,7 @@ namespace
         SET_GUID_INFO(PetBattle, FormatClient);
         SET_GUID_INFO(UniqUserClient, FormatClient);
         SET_GUID_INFO(BattlePet, FormatGlobal);
+        SET_GUID_INFO(Vignette, FormatClient);
         SET_GUID_INFO(CommerceObj, FormatGlobal);
         SET_GUID_INFO(ClientSession, FormatClient);
         SET_GUID_INFO(Cast, FormatWorldObject);
@@ -264,6 +264,11 @@ void ObjectGuid::SetRawValue(std::vector<uint8> const& guid)
 {
     ASSERT(guid.size() == sizeof(*this));
     memcpy(this, guid.data(), sizeof(*this));
+}
+
+uint32 ObjectGuid::GetGUIDLow() const
+{
+    return uint32();
 }
 
 ObjectGuid ObjectGuidFactory::CreateNull()

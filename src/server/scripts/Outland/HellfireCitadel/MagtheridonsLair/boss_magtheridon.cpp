@@ -220,13 +220,10 @@ class boss_magtheridon : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
-                if (!events.IsInPhase(PHASE_BANISH) && !UpdateVictim())
+                if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
                 events.Update(diff);
-
-                if (me->HasUnitState(UNIT_STATE_CASTING))
-                    return;
 
                 while (uint32 eventId = events.ExecuteEvent())
                 {
@@ -253,7 +250,7 @@ class boss_magtheridon : public CreatureScript
                         case EVENT_RELEASED:
                             me->RemoveUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                             me->SetImmuneToPC(false);
-                            DoZoneInCombat();
+                            me->SetInCombatWithZone();
                             instance->SetData(DATA_MANTICRON_CUBE, ACTION_ENABLE);
                             events.ScheduleEvent(EVENT_CLEAVE, Seconds(10));
                             events.ScheduleEvent(EVENT_BLAST_NOVA, Seconds(60));
@@ -296,6 +293,9 @@ class boss_magtheridon : public CreatureScript
                     if (me->HasUnitState(UNIT_STATE_CASTING))
                         return;
                 }
+
+                if (!UpdateVictim())
+                    return;
 
                 DoMeleeAttackIfReady();
             }
@@ -354,7 +354,7 @@ class npc_hellfire_channeler : public CreatureScript
                 if (Creature* magtheridon = _instance->GetCreature(DATA_MAGTHERIDON))
                     magtheridon->AI()->JustSummoned(summon);
 
-                DoZoneInCombat(summon);
+                summon->SetInCombatWithZone();
             }
 
             void EnterEvadeMode(EvadeReason /*why*/) override

@@ -368,7 +368,7 @@ struct advisorbase_ai : public ScriptedAI
         }
     }
 
-    void DamageTaken(Unit* /*killer*/, uint32 &damage) override
+    void DamageTaken(Unit* killer, uint32 &damage) override
     {
         if (damage >= me->GetHealth() && !_inFakeDeath && !_hasRessurrected)
         {
@@ -387,7 +387,7 @@ struct advisorbase_ai : public ScriptedAI
             me->SetTarget(ObjectGuid::Empty);
             me->SetStandState(UNIT_STAND_STATE_DEAD);
             me->GetMotionMaster()->Clear();
-            JustDied(nullptr);
+            JustDied(killer);
         }
     }
 
@@ -572,9 +572,7 @@ class boss_kaelthas : public CreatureScript
                 if (_phase == PHASE_NONE)
                 {
                     DoAction(ACTION_START_ENCOUNTER);
-
-                    if (attacker)
-                        me->SetTarget(attacker->GetGUID());
+                    me->SetTarget(attacker->GetGUID());
                 }
 
                 if (!_hasFullPower && me->HealthBelowPctDamaged(50, damage))
@@ -653,10 +651,10 @@ class boss_kaelthas : public CreatureScript
                 }
             }
 
-            void JustDied(Unit* /*killer*/) override
+            void JustDied(Unit* killer) override
             {
                 Talk(SAY_DEATH);
-                _JustDied();
+                BossAI::JustDied(killer);
             }
 
             void UpdateAI(uint32 diff) override

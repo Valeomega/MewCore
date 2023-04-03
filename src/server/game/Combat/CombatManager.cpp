@@ -43,8 +43,16 @@
         return false;
     if (a->HasUnitState(UNIT_STATE_IN_FLIGHT) || b->HasUnitState(UNIT_STATE_IN_FLIGHT))
         return false;
-    if (a->IsFriendlyTo(b) || b->IsFriendlyTo(a))
-        return false;
+    if (a->IsControlledByPlayer() || b->IsControlledByPlayer())
+    { // PvSomething, only block friendly fire
+        if (a->IsFriendlyTo(b) || b->IsFriendlyTo(a))
+            return false;
+    }
+    else
+    { // CvC, need hostile reaction to start a fight
+        if (!a->IsHostileTo(b) && !b->IsHostileTo(a))
+            return false;
+    }
     Player const* playerA = a->GetCharmerOrOwnerPlayerOrPlayerItself();
     Player const* playerB = b->GetCharmerOrOwnerPlayerOrPlayerItself();
     // ...neither of the two units must be (owned by) a player with .gm on
@@ -185,7 +193,7 @@ bool CombatManager::SetInCombatWith(Unit* who)
     who->GetCombatManager().PutReference(_owner->GetGUID(), ref);
 
     // now, sequencing is important - first we update the combat state, which will set both units in combat and do non-AI combat start stuff
-    bool const needSelfAI  = UpdateOwnerCombatState();
+    bool const needSelfAI = UpdateOwnerCombatState();
     bool const needOtherAI = who->GetCombatManager().UpdateOwnerCombatState();
 
     // then, we finally notify the AI (if necessary) and let it safely do whatever it feels like
@@ -193,7 +201,7 @@ bool CombatManager::SetInCombatWith(Unit* who)
         NotifyAICombat(_owner, who);
     if (needOtherAI)
         NotifyAICombat(who, _owner);
-    return IsInCombatWith(who);
+    return true;
 }
 
 bool CombatManager::IsInCombatWith(ObjectGuid const& guid) const
