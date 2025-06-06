@@ -49,6 +49,26 @@ enum ItemUpdateState
     ITEM_REMOVED                                 = 3
 };
 
+enum ItemSortInventory
+{
+    ITEM_SORT_SPECIAL_ITEM                       = 0,
+    ITEM_SORT_CONSUMABLE                         = 1,
+    ITEM_SORT_WEAPON                             = 2,
+    ITEM_SORT_SHIELD                             = 3,
+    ITEM_SORT_HEAD                               = 4,
+    ITEM_SORT_SHOULDERS                          = 5,
+    ITEM_SORT_CHEST                              = 6,
+    ITEM_SORT_WRISTS                             = 7,
+    ITEM_SORT_HANDS                              = 8,
+    ITEM_SORT_WAIST                              = 9,
+    ITEM_SORT_LEGS                               = 10,
+    ITEM_SORT_FEET                               = 11,
+    ITEM_SORT_CLOAK                              = 12,
+    ITEM_SORT_ACCESSORY                          = 13,
+    ITEM_SORT_BODY_TABARD                        = 14,
+    ITEM_SORT_OTHER_ITEMS                        = 15
+};
+
 #define MAX_ITEM_SPELLS 5
 
 bool ItemCanGoIntoBag(ItemTemplate const* proto, ItemTemplate const* pBagProto);
@@ -328,13 +348,12 @@ class TC_GAME_API Item : public Object
         bool IsPotion() const { return GetTemplate()->IsPotion(); }
         bool IsVellum() const { return GetTemplate()->IsVellum(); }
         bool IsConjuredConsumable() const { return GetTemplate()->IsConjuredConsumable(); }
-        bool IsRangedWeapon() const { return GetTemplate()->IsRangedWeapon(); }
         uint32 GetQuality() const { return _bonusData.Quality; }
         uint32 GetItemLevel(Player const* owner) const;
         static uint32 GetItemLevel(ItemTemplate const* itemTemplate, BonusData const& bonusData, uint32 level, uint32 fixedLevel,
             uint32 minItemLevel, uint32 minItemLevelCutoff, uint32 maxItemLevel, bool pvpBonus, uint32 azeriteLevel);
         int32 GetRequiredLevel() const;
-        int32 GetItemStatType(uint32 index) const { ASSERT(index < MAX_ITEM_PROTO_STATS); return _bonusData.ItemStatType[index]; }
+		int32 GetItemStatType(uint32 index) const;
         float GetItemStatValue(uint32 index, Player const* owner) const;
         uint32 GetSocketColor(uint32 index) const { ASSERT(index < MAX_ITEM_PROTO_SOCKETS); return _bonusData.SocketColor[index]; }
         uint32 GetAppearanceModId() const { return m_itemData->ItemAppearanceModID; }

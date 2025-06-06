@@ -58,7 +58,7 @@ enum LevelLimit
 enum BattlegroundBracketId                                  // bracketId for level ranges
 {
     BG_BRACKET_ID_FIRST          = 0,
-    BG_BRACKET_ID_LAST           = 12,
+    BG_BRACKET_ID_LAST           = 9,
 
     // must be max value in PvPDificulty slot + 1
     MAX_BATTLEGROUND_BRACKETS
@@ -2775,6 +2775,14 @@ enum WorldStateExpressionFunctions
     WSE_FUNCTION_TIME_EVENT_PASSED,
 
     WSE_FUNCTION_MAX,
+};
+
+enum ModifiedCraftingReagentType : uint32
+{
+    MCR_REAGENT_TYPE_OPTIONAL = 0,
+    MCR_REAGENT_TYPE_REQUIRED = 1,
+    MCR_REAGENT_TYPE_FINISHING = 2,
+    MCR_REAGENT_TYPE_SOCKET = 3,
 };
 
 #endif

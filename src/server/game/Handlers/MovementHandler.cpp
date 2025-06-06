@@ -107,6 +107,7 @@ void WorldSession::HandleMoveWorldportAck()
 
     player->ResetMap();
     player->SetMap(newMap);
+    player->UpdatePositionData();
 
     WorldPackets::Movement::ResumeToken resumeToken;
     resumeToken.SequenceIndex = player->m_movementCounter;
@@ -659,6 +660,16 @@ void WorldSession::HandleMoveApplyMovementForceAck(WorldPackets::Movement::MoveA
     updateApplyMovementForce.Status = &moveApplyMovementForceAck.Ack.Status;
     updateApplyMovementForce.Force = &moveApplyMovementForceAck.Force;
     mover->SendMessageToSet(updateApplyMovementForce.Write(), false);
+}
+
+void WorldSession::HandleDiscardedTimeSyncAcks(WorldPackets::Movement::DiscardedTimeSyncAcks& packet)
+{
+    Player* player = GetPlayer();
+
+    if (player->m_movementCounter != packet.MaxSequenceIndex)
+        TC_LOG_ERROR("network", "Received CMSG_DISCARDED_TIME_SYNC_ACKS from player {}, but maxSequenceIndex {} isn't equal real server SequenceIndex {}", player->GetName(), packet.MaxSequenceIndex, player->m_movementCounter);
+
+    player->m_movementCounter = 0;
 }
 
 void WorldSession::HandleMoveRemoveMovementForceAck(WorldPackets::Movement::MoveRemoveMovementForceAck& moveRemoveMovementForceAck)

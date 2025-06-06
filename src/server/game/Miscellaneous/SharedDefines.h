@@ -98,6 +98,7 @@ enum Expansions
     EXPANSION_SHADOWLANDS              = 8,
     EXPANSION_DRAGONFLIGHT             = 9,
     EXPANSION_THE_WAR_WITHIN           = 10,
+    EXPANSION_CLASS_AND_RACE_BLOCKER   = 11,
     MAX_EXPANSIONS,
 
     MAX_ACCOUNT_EXPANSIONS
@@ -130,6 +131,8 @@ constexpr uint32 GetMaxLevelForExpansion(uint32 expansion)
         case EXPANSION_DRAGONFLIGHT:
             return 70;
         case EXPANSION_THE_WAR_WITHIN:
+            return 80;
+        case EXPANSION_CLASS_AND_RACE_BLOCKER:
             return 80;
         default:
             break;
@@ -6900,6 +6903,7 @@ enum GroupJoinBattlegroundResult
     ERR_BATTLEFIELD_TEAM_PARTY_SIZE                 = 22,       // Incorrect party size for this battlefield.
     ERR_NOT_ON_TOURNAMENT_REALM                     = 23,       // Not available on a Tournament Realm.
     ERR_BATTLEGROUND_PLAYERS_FROM_DIFFERENT_REALMS  = 24,       // You cannot queue for a battleground while players from different realms are in your party.
+    ERR_BATTLEGROUND_LEAVE_QUEUE                    = 30,       // Leave queue
     ERR_BATTLEGROUND_JOIN_LEVELUP                   = 33,       // You have been removed from a PvP queue because you have gained a level.
     ERR_REMOVE_FROM_PVP_QUEUE_FACTION_CHANGE        = 34,       // You have been removed from a PvP Queue because you changed your faction.
     ERR_BATTLEGROUND_JOIN_FAILED                    = 35,       // Join as a group failed
@@ -8533,6 +8537,20 @@ enum class SoundKitPlayType : uint8
     Normal      = 0,
     ObjectSound = 1,
     Max         = 2
+};
+
+enum BracketType
+{
+    BRACKET_TYPE_ARENA_2 = 0,
+    BRACKET_TYPE_ARENA_3 = 1,
+    BRACKET_TYPE_ARENA_5 = 2,
+    BRACKET_TYPE_RATED_BG = 3,
+    BRACKET_TYPE_SKIRMISH_2 = 4,
+    BRACKET_TYPE_SKIRMISH_3 = 5,
+    BRACKET_TYPE_BRAWL_BATTLEGROUND = 6,
+    BRACKET_TYPE_BRAWL_ARENA = 7,
+
+    BRACKET_TYPE_MAX
 };
 
 #endif

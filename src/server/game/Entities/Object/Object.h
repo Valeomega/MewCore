@@ -37,6 +37,9 @@
 #include "WowCSEntityDefinitions.h"
 #include <list>
 #include <unordered_map>
+#ifdef ELUNA
+#include "LuaValue.h"
+#endif
 
 class AreaTrigger;
 class Conversation;
@@ -64,6 +67,10 @@ class UpdateData;
 class WorldObject;
 class WorldPacket;
 class ZoneScript;
+#ifdef ELUNA
+class ElunaEventProcessor;
+class Eluna;
+#endif
 struct FactionTemplateEntry;
 struct Loot;
 struct QuaternionData;
@@ -185,6 +192,7 @@ static constexpr Milliseconds const HEARTBEAT_INTERVAL = 5s + 200ms;
 class TC_GAME_API Object
 {
     public:
+        ThisCore::AnyData Variables;
         virtual ~Object();
 
         bool IsInWorld() const { return m_inWorld; }
@@ -857,11 +865,15 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         template <typename Container>
         void GetGameObjectListWithEntryInGrid(Container& gameObjectContainer, uint32 entry, float maxSearchRange = 250.0f) const;
 
+        void GetGameObjectListWithEntryInGridAppend(std::list<GameObject*>& lList, uint32 uiEntry, float fMaxSearchRange = 250.0f) const;
+
         template <typename Container>
         void GetGameObjectListWithOptionsInGrid(Container& gameObjectContainer, float maxSearchRange, FindGameObjectOptions const& options) const;
 
         template <typename Container>
         void GetCreatureListWithEntryInGrid(Container& creatureContainer, uint32 entry, float maxSearchRange = 250.0f) const;
+
+        void GetCreatureListWithEntryInGridAppend(std::list<Creature*>& lList, uint32 uiEntry, float fMaxSearchRange = 250.0f) const;
 
         template <typename Container>
         void GetCreatureListWithOptionsInGrid(Container& creatureContainer, float maxSearchRange, FindCreatureOptions const& options) const;
@@ -891,11 +903,21 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         void SetFarVisible(bool on);
         bool IsVisibilityOverridden() const { return m_visibilityDistanceOverride.has_value(); }
         void SetVisibilityDistanceOverride(VisibilityDistanceType type);
+        void SetVisibilityDistanceOverride(float distance);
         void SetIsStoredInWorldObjectGridContainer(bool apply);
         bool IsAlwaysStoredInWorldObjectGridContainer() const { return m_isStoredInWorldObjectGridContainer; }
         bool IsStoredInWorldObjectGridContainer() const;
 
         uint32  LastUsedScriptID;
+
+#ifdef ELUNA
+        ElunaEventProcessor* elunaEvents;
+
+        Eluna* GetEluna() const;
+
+        LuaVal lua_data = LuaVal({});
+#endif
+
 
         // Transports
         TransportBase* GetTransport() const { return m_transport; }
@@ -941,6 +963,9 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         SmoothPhasing* GetOrCreateSmoothPhasing();
         SmoothPhasing* GetSmoothPhasing() { return _smoothPhasing.get(); }
         SmoothPhasing const* GetSmoothPhasing() const { return _smoothPhasing.get(); }
+
+        Player* FindNearestPlayer(float range, bool alive = true);
+        std::list<Creature*> FindNearestCreatures(std::list<uint32> entrys, float range) const;
 
     protected:
         std::string m_name;
@@ -997,6 +1022,19 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         bool CanDetect(WorldObject const* obj, bool ignoreStealth, bool checkAlert = false) const;
         bool CanDetectInvisibilityOf(WorldObject const* obj) const;
         bool CanDetectStealthOf(WorldObject const* obj, bool checkAlert = false) const;
+
+        public:
+            std::list<Creature*> FindNearestCreatures(uint32 entry, float range) const;
+            std::list<Creature*> FindAllCreaturesInRange(float range);
+            std::list<Creature*> FindAllUnfriendlyCreaturesInRange(float range);
+            std::list<GameObject*> FindNearestGameObjects(uint32 entry, float range) const;
+            AreaTrigger* SelectNearestAreaTrigger(uint32 spellId, float distance) const;
+            std::list<AreaTrigger*> SelectNearestAreaTriggers(uint32 spellId, float range);
+            std::list<Player*> SelectNearestPlayers(float range, bool alive);
+            Player* SelectRandomPlayerInRange(float range, bool alive);
+            template <typename Container>
+            void GetCreatureListInGrid(Container& creatureContainer, float maxSearchRange = 250.0f) const;
+            ThisCore::AnyData VariableStorage;
 };
 
 namespace Trinity

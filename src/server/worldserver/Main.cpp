@@ -659,7 +659,8 @@ bool StartDB()
         .AddDatabase(LoginDatabase, "Login")
         .AddDatabase(CharacterDatabase, "Character")
         .AddDatabase(WorldDatabase, "World")
-        .AddDatabase(HotfixDatabase, "Hotfix");
+        .AddDatabase(HotfixDatabase, "Hotfix")
+        .AddDatabase(RoleplayDatabase, "Roleplay");
 
     if (!loader.Load())
         return false;
@@ -675,7 +676,7 @@ bool StartDB()
 
 void StopDB()
 {
-    HotfixDatabase.Close();
+    //HotfixDatabase.Close();
     WorldDatabase.Close();
     CharacterDatabase.Close();
     LoginDatabase.Close();

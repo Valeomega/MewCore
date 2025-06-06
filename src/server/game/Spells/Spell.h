@@ -433,6 +433,7 @@ class TC_GAME_API Spell
         void EffectSendChatMessage();
         void EffectGrantBattlePetExperience();
         void EffectLearnTransmogIllusion();
+        void EffectCraftItem();
         void EffectModifyAuraStacks();
         void EffectModifyCooldown();
         void EffectModifyCooldowns();
@@ -443,6 +444,23 @@ class TC_GAME_API Spell
         void EffectTeleportGraveyard();
         void EffectUpdateInteractions();
         void EffectLearnWarbandScene();
+
+        //NEW
+        void EffectApplyAreaAura();
+        void EffectSurvey();
+        void EffectCorpseLoot();
+        void EffectSpecCount();
+        void EffectObliterateItem();
+        void EffectDespawnAreatrigger();
+        void SendScene();
+        void EffectLootWithToast();
+        void EffectJoinOrLeavePlayerParty();
+        uint8 m_diffMode;
+        void EffectModReputation();
+        void EffectRemovePhase();
+        void EffectIncreaseSkill();
+        void EffectForceEquipItem();
+        void EffectScrapItem();
 
         typedef std::unordered_set<Aura*> UsedSpellMods;
 
@@ -528,7 +546,7 @@ class TC_GAME_API Spell
         SpellState getState() const { return m_spellState; }
         void setState(SpellState state) { m_spellState = state; }
 
-        void DoCreateItem(uint32 itemId, ItemContext context = ItemContext::NONE, std::vector<int32> const* bonusListIDs = nullptr);
+        Item* DoCreateItem(uint32 itemId, ItemContext context = ItemContext::NONE, std::vector<int32> const* bonusListIDs = nullptr, bool update = true);
 
         bool CheckEffectTarget(Unit const* target, SpellEffectInfo const& spellEffectInfo, Position const* losPosition) const;
         bool CheckEffectTarget(GameObject const* target, SpellEffectInfo const& spellEffectInfo) const;
@@ -639,6 +657,7 @@ class TC_GAME_API Spell
         bool IsChannelActive() const;
         bool IsAutoActionResetSpell() const;
         bool IsPositive() const;
+        bool IsCritForTarget(Unit* target) const;
 
         bool IsEmpowerSpell() const { return m_empower != nullptr; }
         void SetEmpowerReleasedByClient(bool release);
@@ -917,6 +936,7 @@ class TC_GAME_API Spell
     protected:
         void CallScriptObjectAreaTargetSelectHandlers(std::list<WorldObject*>& targets, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType);
         void CallScriptObjectTargetSelectHandlers(WorldObject*& target, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType);
+        void CallScriptOnSummonHandlers(Creature* creature);
         void CallScriptDestinationTargetSelectHandlers(SpellDestination& target, SpellEffIndex effIndex, SpellImplicitTargetInfo const& targetType);
         void CallScriptEmpowerStageCompletedHandlers(int32 completedStagesCount);
         void CallScriptEmpowerCompletedHandlers(int32 completedStagesCount);
@@ -940,7 +960,7 @@ class TC_GAME_API Spell
         HitTriggerSpellList m_hitTriggerSpells;
 
         // effect helpers
-        void SummonGuardian(SpellEffectInfo const* effect, uint32 entry, SummonPropertiesEntry const* properties, uint32 numSummons, ObjectGuid privateObjectOwner);
+        TempSummon* SummonGuardian(SpellEffectInfo const* effect, uint32 entry, SummonPropertiesEntry const* properties, uint32 numSummons, ObjectGuid privateObjectOwner);
         void CalculateJumpSpeeds(SpellEffectInfo const* effInfo, float dist, float& speedXY, float& speedZ);
 
         void UpdateSpellCastDataTargets(WorldPackets::Spells::SpellCastData& data);

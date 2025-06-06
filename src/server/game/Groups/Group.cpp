@@ -38,6 +38,9 @@
 #include "Player.h"
 #include "UpdateData.h"
 #include "WorldSession.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 Seconds Group::CountdownInfo::GetTimeLeft() const
 {
@@ -204,6 +207,11 @@ bool Group::Create(Player* leader)
     }
     else if (!AddMember(leader))
         return false;
+
+#ifdef ELUNA
+    if (Eluna* e = leader->GetEluna())
+        e->OnCreate(this, m_leaderGuid, m_groupFlags);
+#endif
 
     return true;
 }
@@ -1257,6 +1265,9 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(BattlegroundTemplate
         // don't let join to bg queue random if someone from the group is already in bg queue
         if (BattlegroundMgr::IsRandomBattleground(bgOrTemplate->Id) && member->InBattlegroundQueue(true) && !isInRandomBgQueue)
             return ERR_IN_NON_RANDOM_BG;
+        // Check if already in same queue (dupe).
+        if (member->GetBattlegroundQueueIndex(bgQueueTypeId) < PLAYER_MAX_BATTLEGROUND_QUEUES)
+            return ERR_BATTLEGROUND_DUPE_QUEUE;
         // check for deserter debuff in case not arena queue
         if (bgOrTemplate->Id != BATTLEGROUND_AA && member->IsDeserter())
             return ERR_GROUP_JOIN_BATTLEGROUND_DESERTERS;

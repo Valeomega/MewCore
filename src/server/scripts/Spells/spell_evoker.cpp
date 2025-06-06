@@ -27,6 +27,8 @@
 #include "DB2Stores.h"
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "AreaTrigger.h"
+#include "AreaTriggerAI.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
 #include "SpellHistory.h"
@@ -78,7 +80,12 @@ enum EvokerSpells
     SPELL_EVOKER_SNAPFIRE                       = 370818,
     SPELL_EVOKER_SOAR_RACIAL                    = 369536,
     SPELL_EVOKER_VERDANT_EMBRACE_HEAL           = 361195,
-    SPELL_EVOKER_VERDANT_EMBRACE_JUMP           = 373514
+    SPELL_EVOKER_VERDANT_EMBRACE_JUMP           = 373514,
+    SPELL_VISAGE                                = 372014,
+    SPELL_ALTERED_FORM                          = 97709,
+    SPELL_HATRED                                = 118328,
+    SPELL_SKYWARD_ASCENT                        = 376744,
+    SPELL_SURGE_FORWARD                         = 376743,
 };
 
 enum EvokerSpellLabels
@@ -765,6 +772,83 @@ class spell_evo_verdant_embrace_trigger_heal : public SpellScript
     }
 };
 
+// 369536 - Soar
+class spell_evo_soar : public SpellScript
+{
+    void HandleOnCast()
+    {
+        Unit* caster = GetCaster();
+        caster->GetMotionMaster()->MoveJump(caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ() + 30.0f, 20.0f, 10.0f);
+    }
+    void HandleAfterCast()
+    {
+        Player* caster = GetCaster()->ToPlayer();
+
+        caster->CastSpell(caster, 430747, true);
+
+        float SURGE_SPEED = 30.0f;
+
+        float destX = caster->GetPositionX() + SURGE_SPEED * std::cos(caster->GetOrientation());
+        float destY = caster->GetPositionY() + SURGE_SPEED * std::sin(caster->GetOrientation());
+        float destZ = caster->GetPositionZ() + SURGE_SPEED * std::tan(caster->m_movementInfo.pitch);
+
+        caster->AddMoveImpulse(Position(destX - caster->GetPositionX(), destY - caster->GetPositionY(), destZ - caster->GetPositionZ()));
+    }
+    void Register() override
+    {
+        OnCast += SpellCastFn(spell_evo_soar::HandleOnCast);
+        AfterCast += SpellCastFn(spell_evo_soar::HandleAfterCast);
+    }
+};
+
+// 351239 - Visage (Racial)
+class spell_evo_cosmic_visage : public SpellScript
+{
+    void HandleOnCast()
+    {
+        Unit* caster = GetCaster();
+
+        if (caster->HasAura(SPELL_VISAGE))
+        {
+            // Dracthyr Form
+            caster->RemoveAurasDueToSpell(SPELL_VISAGE);
+            caster->CastSpell(caster, SPELL_ALTERED_FORM, true);
+            caster->SendPlaySpellVisual(caster, SPELL_HATRED, 0, 0, 60, false);
+            caster->SetDisplayId(108590);
+        }
+        else
+        {
+            // Visage Form
+            if (caster->HasAura(SPELL_ALTERED_FORM))
+                caster->RemoveAurasDueToSpell(SPELL_ALTERED_FORM);
+
+            caster->CastSpell(caster, SPELL_VISAGE, true);
+            caster->SendPlaySpellVisual(caster, SPELL_HATRED, 0, 0, 60, false);
+            caster->SetDisplayId(104597);
+        }
+    }
+
+    void Register()
+    {
+        OnCast += SpellCastFn(spell_evo_cosmic_visage::HandleOnCast);
+    }
+};
+
+// 359073 - Eternity Surge
+class spell_evo_eternity_surge : public SpellScript
+{
+    void OnComplete(int32 /*completedStageCount*/) const
+    {
+        GetCaster()->CastSpell(GetExplTargetUnit(), 359077, CastSpellExtraArgs()
+            .SetTriggeringSpell(GetSpell())
+            .SetTriggerFlags(TRIGGERED_IGNORE_CAST_IN_PROGRESS | TRIGGERED_DONT_REPORT_CAST_ERROR));
+    }
+    void Register() override
+    {
+        OnEmpowerCompleted += SpellOnEmpowerStageCompletedFn(spell_evo_eternity_surge::OnComplete);
+    }
+};
+
 void AddSC_evoker_spell_scripts()
 {
     RegisterSpellScript(spell_evo_azure_strike);
@@ -792,4 +876,9 @@ void AddSC_evoker_spell_scripts()
     RegisterSpellScript(spell_evo_snapfire_bonus_damage);
     RegisterSpellScript(spell_evo_verdant_embrace);
     RegisterSpellScript(spell_evo_verdant_embrace_trigger_heal);
+
+    //new
+    RegisterSpellScript(spell_evo_soar);
+    RegisterSpellScript(spell_evo_cosmic_visage);
+    RegisterSpellScript(spell_evo_eternity_surge);
 }

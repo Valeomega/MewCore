@@ -26,6 +26,7 @@
 #include "Timer.h"
 #include "UnitDefines.h"
 #include "Util.h"
+#include "TaskScheduler.h"
 #include <array>
 #include <forward_list>
 #include <map>
@@ -74,6 +75,7 @@ struct MountCapabilityEntry;
 struct SpellClickInfo;
 struct SpellValue;
 struct TeleportLocation;
+struct FlightCapabilityEntry;
 
 class Aura;
 class AuraApplication;
@@ -1090,6 +1092,7 @@ class TC_GAME_API Unit : public WorldObject
 
         bool isTargetableForAttack(bool checkFakeDeath = true) const;
 
+        bool IsInAir() const;
         bool IsInWater() const;
         bool IsUnderWater() const;
         bool IsOnOceanFloor() const;
@@ -1376,11 +1379,13 @@ class TC_GAME_API Unit : public WorldObject
 
         int32 GetTotalAuraModifier(AuraType auraType) const;
         float GetTotalAuraMultiplier(AuraType auraType) const;
+        float GetTotalAuraPercent(AuraType auraType) const;
         int32 GetMaxPositiveAuraModifier(AuraType auraType) const;
         int32 GetMaxNegativeAuraModifier(AuraType auraType) const;
 
         int32 GetTotalAuraModifier(AuraType auraType, std::function<bool(AuraEffect const*)> const& predicate) const;
         float GetTotalAuraMultiplier(AuraType auraType, std::function<bool(AuraEffect const*)> const& predicate) const;
+        float GetTotalAuraPercent(AuraType auraType, std::function<bool(AuraEffect const*)> const& predicate) const;
         int32 GetMaxPositiveAuraModifier(AuraType auraType, std::function<bool(AuraEffect const*)> const& predicate) const;
         int32 GetMaxNegativeAuraModifier(AuraType auraType, std::function<bool(AuraEffect const*)> const& predicate) const;
 
@@ -1407,6 +1412,7 @@ class TC_GAME_API Unit : public WorldObject
         uint32 GetCreateHealth() const { return m_unitData->BaseHealth; }
         void SetCreateMana(uint32 val) { SetUpdateFieldValue(m_values.ModifyValue(&Unit::m_unitData).ModifyValue(&UF::UnitData::BaseMana), val); }
         uint32 GetCreateMana() const { return m_unitData->BaseMana; }
+        uint32 GetMaxVigor() const;
         virtual int32 GetCreatePowerValue(Powers power) const;
         float GetPosStat(Stats stat) const { return m_unitData->StatPosBuff[stat]; }
         float GetNegStat(Stats stat) const { return m_unitData->StatNegBuff[stat]; }
@@ -1491,6 +1497,29 @@ class TC_GAME_API Unit : public WorldObject
 
         std::array<ObjectGuid, MAX_SUMMON_SLOT> m_SummonSlot;
         std::array<ObjectGuid, MAX_GAMEOBJECT_SLOT> m_ObjectSlot;
+
+        void AddSummonedCreature(ObjectGuid guid, uint32 entry);
+        void RemoveSummonedCreature(ObjectGuid guid);
+        Creature* GetSummonedCreatureByEntry(uint32 entry);
+        int32 GetTotalSpellPowerValue(SpellSchoolMask mask, bool heal) const;
+        void UnsummonCreatureByEntry(uint32 entry, uint32 ms = 0);
+
+
+        /// Add timed delayed operation
+        /// @p_Timeout  : Delay time
+        /// @p_Function : Callback function
+        void AddDelayedEvent(uint32 timeout, std::function<void()>&& function)
+        {
+            emptyWarned = false;
+            timedDelayedOperations.push_back(std::pair<uint32, std::function<void()>>(timeout, function));
+        }
+        std::vector<std::pair<int32, std::function<void()>>>timedDelayedOperations; ///< Delayed operations
+        bool emptyWarned; ///< Warning when there are no more delayed operations
+        void GetAnyUnitListInRange(std::list<Unit*>& list, float fMaxSearchRange) const;
+
+        void GetAttackableUnitListInRange(std::list<Unit*>& list, float fMaxSearchRange) const;
+        int32 GetAuraEffectAmount(AuraType auraType, SpellFamilyNames spellFamilyName, uint32 IconFileDataId, uint8 effIndex) const;
+        int32 GetAuraEffectAmount(uint32 spellId, uint8 effIndex, ObjectGuid casterGuid = ObjectGuid::Empty) const;
 
         ShapeshiftForm GetShapeshiftForm() const { return ShapeshiftForm(*m_unitData->ShapeshiftForm); }
         void SetShapeshiftForm(ShapeshiftForm form);
@@ -1598,7 +1627,7 @@ class TC_GAME_API Unit : public WorldObject
 
         virtual float GetNativeObjectScale() const { return 1.0f; }
         virtual void RecalculateObjectScale();
-        uint32 GetDisplayId() const { return m_unitData->DisplayID; }
+        virtual uint32 GetDisplayId() const { return m_unitData->DisplayID; }
         float GetDisplayScale() const { return m_unitData->DisplayScale; }
         virtual void SetDisplayId(uint32 displayId, bool setNative = false);
         uint32 GetNativeDisplayId() const { return m_unitData->NativeDisplayID; }
@@ -1620,6 +1649,7 @@ class TC_GAME_API Unit : public WorldObject
         void AddGameObject(GameObject* gameObj);
         void RemoveGameObject(GameObject* gameObj, bool del);
         void RemoveGameObject(uint32 spellid, bool del);
+        void RemoveAllAreaObjects();//new
         void RemoveAllGameObjects();
 
         // AreaTrigger management
@@ -1728,6 +1758,7 @@ class TC_GAME_API Unit : public WorldObject
         void SetExtraUnitMovementFlags2(uint32 f) { m_movementInfo.SetExtraMovementFlags2(f); }
 
         bool IsSplineEnabled() const;
+        bool IsSplineFinished() const;
 
         void SetControlled(bool apply, UnitState state);
         void ApplyControlStatesIfNeeded();
@@ -1735,6 +1766,7 @@ class TC_GAME_API Unit : public WorldObject
         ///----------Pet responses methods-----------------
         void SendPetActionFeedback(PetActionFeedback msg, uint32 spellId);
         void SendPetTalk(uint32 pettalk);
+        void SendPetDismissSound();
         void SendPetAIReaction(ObjectGuid guid);
         ///----------End of Pet responses methods----------
 
@@ -1788,6 +1820,9 @@ class TC_GAME_API Unit : public WorldObject
         bool IsFalling() const;
         virtual bool CanEnterWater() const = 0;
         virtual bool CanSwim() const;
+
+        void CalculateAdvFlyingSpeeds();
+        float GetAdvFlyingVelocity() const;
 
         float GetHoverOffset() const { return HasUnitMovementFlag(MOVEMENTFLAG_HOVER) ? *m_unitData->HoverHeight : 0.0f; }
 
@@ -1843,6 +1878,8 @@ class TC_GAME_API Unit : public WorldObject
         uint32 GetVirtualItemId(uint32 slot) const;
         uint16 GetVirtualItemAppearanceMod(uint32 slot) const;
         void SetVirtualItem(uint32 slot, uint32 itemId, uint16 appearanceModId = 0, uint16 itemVisual = 0);
+
+        void GetFriendlyUnitListInRange(std::list<Unit*>& list, float fMaxSearchRange, bool exceptSelf = false) const;
 
         // returns if the unit can't enter combat
         bool IsCombatDisallowed() const { return _isCombatDisallowed; }
@@ -1968,6 +2005,9 @@ class TC_GAME_API Unit : public WorldObject
         void AtStartOfEncounter(EncounterType type);
         void AtEndOfEncounter(EncounterType type);
 
+        typedef std::list<AreaTrigger*> AreaObjectList;//new
+        AreaObjectList m_AreaObj; //new
+
     private:
 
         void UpdateSplineMovement(uint32 t_diff);
@@ -2032,7 +2072,23 @@ class TC_GAME_API Unit : public WorldObject
         std::unique_ptr<MovementForces> _movementForces;
         PositionUpdateInfo _positionUpdateInfo;
 
+        std::unordered_map<ObjectGuid, uint32/*entry*/> m_SummonedCreatures;
+
         bool _isCombatDisallowed;
+
+        std::array<float, ADV_FLYING_MAX_SPEED_TYPE> _advFlyingSpeeds;
+
+    public:
+        TaskScheduler _scheduler;
+        TaskScheduler& GetScheduler() { return _scheduler; }
+
+    public:
+        typedef std::unordered_multimap<uint32 /*spellId*/, ObjectGuid /*targetGuid*/> TargetAuraContainer;
+        TargetAuraContainer m_targetAuras;
+        typedef std::vector<AuraApplication*> AuraApplicationVector;
+        Unit::AuraApplicationVector GetTargetAuraApplications(uint32 spellId) const;
+
+        bool IsAlliedRace();
 };
 
 #endif

@@ -41,6 +41,26 @@ namespace WorldPackets
 {
     namespace Misc
     {
+        class PreloadWorld final : public ServerPacket
+        {
+        public:
+            PreloadWorld() : ServerPacket(SMSG_PRELOAD_WORLD) { }
+
+            WorldPacket const* Write() override;
+
+            uint32 MapID = 0;
+            float x = 0.f;
+            float y = 0.f;
+            float z = 0.f;
+            float o = 0.f;
+            uint32 unk1 = -1;
+            uint32 unk2 = -1;
+            uint32 unk3 = 21;
+            uint32 unk4 = 0;
+            uint32 unk5 = 0;
+            uint32 unk6 = 0;
+        };
+
         class BindPointUpdate final : public ServerPacket
         {
         public:
@@ -887,7 +907,7 @@ namespace WorldPackets
             bool Enable = false;
         };
 
-        class OverrideLight final : public ServerPacket
+        class TC_GAME_API OverrideLight final : public ServerPacket
         {
         public:
             explicit OverrideLight() : ServerPacket(SMSG_OVERRIDE_LIGHT, 4 + 4 + 4) { }
@@ -1005,16 +1025,57 @@ namespace WorldPackets
             WorldPacket const* Write() override;
 
             uint64 Quantity = 0;
+            uint32 QuestID = 0;
             ::DisplayToastMethod DisplayToastMethod = { };
             bool Mailed = false;
             DisplayToastType Type = { };
-            uint32 QuestID = 0;
             bool IsSecondaryResult = false;
             Item::ItemInstance Item;
-            bool BonusRoll = false;
             int32 LootSpec = 0;
             ::Gender Gender = GENDER_NONE;
+            bool BonusRoll = false;
+            bool ForceToast = false;    ///< Ignores ITEM_FLAG3_DO_NOT_TOAST
             uint32 CurrencyID = 0;
+        };
+		
+		class LegendaryCraftingOpenNpc  final : public ServerPacket
+        {
+        public:
+            explicit LegendaryCraftingOpenNpc() : ServerPacket(SMSG_RUNEFORGE_LEGENDARY_CRAFTING_OPEN_NPC, 16) {}
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid ObjGUID;
+            bool IsUpgrade = false;
+        };
+
+        class PerksProgramReqestPendingRewards final : public ClientPacket
+        {
+        public:
+            explicit PerksProgramReqestPendingRewards(WorldPacket&& packet) : ClientPacket(CMSG_PERKS_PROGRAM_REQUEST_PENDING_REWARDS, std::move(packet)) { }
+
+            void Read() override {}
+        };
+
+        class OverrideScreenFlash final : public ClientPacket
+        {
+        public:
+            explicit OverrideScreenFlash(WorldPacket&& packet) : ClientPacket(CMSG_OVERRIDE_SCREEN_FLASH, std::move(packet)) { }
+
+            void Read() override;
+
+            bool BlackScreenOrRedScreen;
+        };
+
+        class PlayerChoiceClear final : public ServerPacket
+        {
+        public:
+            explicit PlayerChoiceClear() :ServerPacket(SMSG_PLAYER_CHOICE_CLEAR) { }
+
+            WorldPacket const* Write() override;
+
+            int32 ChoiceID;
+            bool Status;
         };
 
         class AccountWarbandSceneUpdate final : public ServerPacket
@@ -1026,6 +1087,45 @@ namespace WorldPackets
 
             bool IsFullUpdate = false;
             WarbandSceneCollectionContainer const* WarbandScenes = nullptr;
+        };
+
+        class AccountNotificationAcknowledge final : public ClientPacket
+        {
+        public:
+            explicit AccountNotificationAcknowledge(WorldPacket&& packet) : ClientPacket(CMSG_ACCOUNT_NOTIFICATION_ACKNOWLEDGED, std::move(packet)) { }
+
+            void Read() override;
+
+            int64 unk;
+            int32 unk2;
+            int32 unk3;
+        };
+
+        class ShowTradeSkillResponse final : public ServerPacket
+        {
+        public:
+            explicit ShowTradeSkillResponse() : ServerPacket(SMSG_SHOW_TRADE_SKILL_RESPONSE, 16 + 4 + 12) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid PlayerGUID;
+            uint32 SpellId = 0;
+            std::vector<int32> SkillLineIDs;
+            std::vector<int32> SkillRanks;
+            std::vector<int32> SkillMaxRanks;
+            std::vector<int32> KnownAbilitySpellIDs;
+        };
+
+        class ShowTradeSkill final : public ClientPacket
+        {
+        public:
+            explicit ShowTradeSkill(WorldPacket&& packet) : ClientPacket(CMSG_SHOW_TRADE_SKILL, std::move(packet)) { }
+
+            void Read() override;
+
+            ObjectGuid PlayerGUID;
+            uint32 SpellID = 0;
+            uint32 SkillLineID = 0;
         };
     }
 }

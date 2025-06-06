@@ -46,6 +46,7 @@ struct BarberShopStyleEntry;
 struct BattlegroundTemplate;
 struct CharTitlesEntry;
 struct ChatChannelsEntry;
+struct ChrCustomizationOptionEntry;
 struct ChrSpecializationEntry;
 struct CreatureTemplate;
 struct CurrencyTypesEntry;
@@ -109,6 +110,7 @@ enum class PlayerCreateMode : int8;
 enum RestTypes : uint8;
 enum class SpawnTrackingState : uint8;
 enum TransferAbortReason : uint32;
+enum OpcodeServer : uint32;
 
 namespace BattlePets
 {
@@ -448,6 +450,12 @@ enum DrunkenState
 
 #define MAX_DRUNKEN   4
 
+enum BarberState
+{
+    NOT_IN_BARBER_STATE = 0,
+    JUST_PASSED_BARBER_CHECKS = 1,
+};
+
 enum PlayerFlags
 {
     PLAYER_FLAGS_GROUP_LEADER           = 0x00000001,
@@ -648,6 +656,7 @@ static_assert(UF::size<decltype(UF::ActivePlayerData::InvSlots)>() == PLAYER_SLO
 
 #define INVENTORY_SLOT_BAG_0    255
 #define INVENTORY_DEFAULT_SIZE  16
+#define INVENTORY_SECURED_SIZE  20
 
 enum EquipmentSlots : uint8                                 // 19 slots
 {
@@ -1277,6 +1286,10 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void SetCommandStatusOn(uint32 command) { _activeCheats |= command; }
         void SetCommandStatusOff(uint32 command) { _activeCheats &= ~command; }
 
+        bool GetOverrideScreenFlash() const { return overrideScreenFlash; }
+        void SetOverrideScreenFlash(bool value) { overrideScreenFlash = value; }
+        bool IsOverrideScreenFlash() const { return overrideScreenFlash; }
+
         // Played Time Stuff
         time_t m_logintime;
         time_t m_Last_tick;
@@ -1412,6 +1425,7 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
     public:
         void UpdateAverageItemLevelTotal();
         void UpdateAverageItemLevelEquipped();
+        void SendPreloadWorld(int mapID, float x, float y, float z);
 
         uint8 FindEquipSlot(Item const* item, uint32 slot, bool swap) const;
         uint32 GetFreeInventorySlotCount(EnumFlag<ItemSearchLocation> location = ItemSearchLocation::Inventory) const;
@@ -1422,6 +1436,7 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         std::vector<Item*> GetItemListByEntry(uint32 entry, bool inBankAlso = false) const;
         Item* GetItemByPos(uint16 pos) const;
         Item* GetItemByPos(uint8 bag, uint8 slot) const;
+		Item* GetEquippedItem(EquipmentSlots slot) const; //Custom
         Item* GetUseableItemByPos(uint8 bag, uint8 slot) const;
         Bag*  GetBagByPos(uint8 slot) const;
         std::vector<Item*> GetCraftingReagentItemsToDeposit();
@@ -1461,6 +1476,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void SetBankBagSlotFlag(uint32 bagIndex, EnumFlag<BagSlotFlags> flags) { SetUpdateFieldFlagValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::BankBagSlotFlags, bagIndex), flags.AsUnderlyingType()); }
         void RemoveBankBagSlotFlag(uint32 bagIndex, EnumFlag<BagSlotFlags> flags) { RemoveUpdateFieldFlagValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::BankBagSlotFlags, bagIndex), flags.AsUnderlyingType()); }
         void ReplaceAllBankBagSlotFlags(uint32 bagIndex, EnumFlag<BagSlotFlags> flags) { SetUpdateFieldValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::BankBagSlotFlags, bagIndex), flags.AsUnderlyingType()); }
+        bool HasBankBagAnyPriorityFlag(uint8 bagSlot);
+        bool HasBagAnyPriorityFlag(uint8 bagSlot);
         bool HasItemCount(uint32 item, uint32 count = 1, bool inBankAlso = false) const;
         bool HasItemFitToSpellRequirements(SpellInfo const* spellInfo, Item const* ignoreItem = nullptr) const;
         bool CanNoReagentCast(SpellInfo const* spellInfo) const;
@@ -1477,6 +1494,9 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         InventoryResult CanStoreNewItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, uint32 item, uint32 count, uint32* no_space_count = nullptr) const;
         InventoryResult CanStoreItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, Item* pItem, bool swap = false) const;
         InventoryResult CanStoreItems(Item** items, int count, uint32* offendingItemId) const;
+        void StoreItemInBag(Item* item);
+        void StoreItemInBank(Item* item);
+        void StoreItemInReagentBank(Item* item);
         InventoryResult CanEquipNewItem(uint8 slot, uint16& dest, uint32 item, bool swap) const;
         InventoryResult CanEquipItem(uint8 slot, uint16& dest, Item* pItem, bool swap, bool not_loading = true) const;
 
@@ -1501,8 +1521,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void EquipChildItem(uint8 parentBag, uint8 parentSlot, Item* parentItem);
         void AutoUnequipChildItem(Item* parentItem);
         bool StoreNewItemInBestSlots(uint32 itemId, uint32 amount, ItemContext context);
-        void AutoStoreLoot(uint8 bag, uint8 slot, uint32 loot_id, LootStore const& store, ItemContext context = ItemContext::NONE, bool broadcast = false, bool createdByPlayer = false);
-        void AutoStoreLoot(uint32 loot_id, LootStore const& store, ItemContext context = ItemContext::NONE, bool broadcast = false, bool createdByPlayer = false) { AutoStoreLoot(NULL_BAG, NULL_SLOT, loot_id, store, context, broadcast, createdByPlayer); }
+        void AutoStoreLoot(uint8 bag, uint8 slot, uint32 loot_id, LootStore const& store, ItemContext context = ItemContext::NONE, bool broadcast = false, bool createdByPlayer = false, DisplayToastMethod toastMethod = DisplayToastMethod::Default);
+        void AutoStoreLoot(uint32 loot_id, LootStore const& store, ItemContext context = ItemContext::NONE, bool broadcast = false, bool createdByPlayer = false, DisplayToastMethod toastMethod = DisplayToastMethod::Default) { AutoStoreLoot(NULL_BAG, NULL_SLOT, loot_id, store, context, broadcast, createdByPlayer, toastMethod); }
         void StoreLootItem(ObjectGuid lootWorldObjectGuid, uint8 lootSlot, Loot* loot, AELootResult* aeResult = nullptr);
 
         InventoryResult CanTakeMoreSimilarItems(uint32 entry, uint32 count, Item* pItem, uint32* no_space_count = nullptr, uint32* offendingItemId = nullptr) const;
@@ -1605,6 +1625,7 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void LoadCorpse(PreparedQueryResult result);
 
         bool AddItem(uint32 itemId, uint32 count);
+		bool AddItemBonus(uint32 itemId, uint32 count, uint32 bonusId); //Custom
 
         /*********************************************************/
         /***                    GOSSIP SYSTEM                  ***/
@@ -1809,6 +1830,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void SaveToDB(LoginDatabaseTransaction loginTransaction, CharacterDatabaseTransaction trans, bool create = false);
         void SaveInventoryAndGoldToDB(CharacterDatabaseTransaction trans);                    // fast save function for item/money cheating preventing
 
+        static void RemoveRaceGenderModelCustomizations(CharacterDatabaseTransaction trans, ObjectGuid::LowType guid, uint8 race, uint8 gender);
+        static void RemoveShapehiftRaceCustomizations(CharacterDatabaseTransaction trans, ObjectGuid::LowType guid, uint8 oldRace, uint8 newRace);
         static void SaveCustomizations(CharacterDatabaseTransaction trans, ObjectGuid::LowType guid,
             Trinity::IteratorPair<UF::ChrCustomizationChoice const*> customizations);
         static void SavePositionInDB(WorldLocation const& loc, uint16 zoneId, ObjectGuid guid, CharacterDatabaseTransaction trans);
@@ -1881,7 +1904,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void CharmSpellInitialize();
         void PossessSpellInitialize();
         void VehicleSpellInitialize();
-        void SendRemoveControlBar() const;
+        void SendRemoveControlBar();
+        void SendPetGuids();
         bool HasSpell(uint32 spell) const override;
         bool HasActiveSpell(uint32 spell) const;            // show in spellbook
         SpellInfo const* GetCastSpellInfo(SpellInfo const* spellInfo, TriggerCastFlags& triggerFlag, GetCastSpellInfoContext* context) const override;
@@ -2141,6 +2165,9 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void ApplyModDamageDoneNeg(SpellSchools school, int32 mod, bool apply) { ApplyModUpdateFieldValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::ModDamageDoneNeg, school), mod, apply); }
         void ApplyModDamageDonePercent(SpellSchools school, float pct, bool apply) { ApplyPercentModUpdateFieldValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::ModDamageDonePercent, school), pct, apply); }
         void SetModDamageDonePercent(uint8 school, float pct) { SetUpdateFieldValue(m_values.ModifyValue(&Player::m_activePlayerData).ModifyValue(&UF::ActivePlayerData::ModDamageDonePercent, school), pct); }
+        float GetModDamageDonePos(SpellSchools school) { return m_activePlayerData->ModDamageDonePos[school]; }
+        float GetModDamageDoneNeg(SpellSchools school) { return m_activePlayerData->ModDamageDoneNeg[school]; }
+        float GetModDamageDonePercent(SpellSchools school) { return m_activePlayerData->ModDamageDonePercent[school]; }
         void ApplyRatingMod(CombatRating cr, int32 value, bool apply);
         void UpdateRating(CombatRating cr);
         void UpdateAllRatings();
@@ -2193,6 +2220,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void RemoveLootRoll(LootRoll* roll);
 
         void RemovedInsignia(Player* looterPlr);
+
+        void AddMoveImpulse(Position direction);
 
         WorldSession* GetSession() const { return m_session; }
 
@@ -2334,6 +2363,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         static TeamId TeamIdForRace(uint8 race);
         static uint8 GetFactionGroupForRace(uint8 race);
         Team GetTeam() const { return m_team; }
+        Team GetNativeTeam() const { return TeamForRace(GetRace()); }
+        void SetTeam(Team team) { m_team = team; }
         TeamId GetTeamId() const { return GetTeamIdForTeam(m_team); }
         void SetFactionForRace(uint8 race);
 
@@ -2510,7 +2541,7 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         bool InBattlegroundQueueForBattlegroundQueueType(BattlegroundQueueTypeId bgQueueTypeId) const;
 
         void SetBattlegroundId(uint32 val, BattlegroundTypeId bgTypeId, BattlegroundQueueTypeId queueId);
-        uint32 AddBattlegroundQueueId(BattlegroundQueueTypeId val);
+        uint32 AddBattlegroundQueueId(BattlegroundQueueTypeId val, uint32 joinTime, uint32 IsInvitedToBGInstanceGUID);
         bool HasFreeBattlegroundQueueId() const;
         void RemoveBattlegroundQueueId(BattlegroundQueueTypeId val);
         void SetInviteForBattlegroundQueueType(BattlegroundQueueTypeId bgQueueTypeId, uint32 instanceId);
@@ -2597,6 +2628,32 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
             m_recall_location.InstanceId = GetInstanceId();
         }
         void Recall() { TeleportTo(m_recall_location, TELE_TO_NONE); }
+
+        void SaveManualRecallPosition()
+        {
+            manual_recall_location.WorldRelocate(*this);
+            manual_recall_instanceId = GetInstanceId();
+        }
+
+        void ManualRecall()
+        {
+            if (IsManualRecallPositionValid())
+            {
+                TeleportTo(manual_recall_location, TELE_TO_NONE, manual_recall_instanceId);
+            }
+        }
+
+        void ClearManualRecallPosition()
+        {
+            manual_recall_location.WorldRelocate(*this);
+            manual_recall_location.m_mapId = 4294967295;
+            manual_recall_instanceId = -1;
+        }
+
+        bool IsManualRecallPositionValid()
+        {
+            return manual_recall_location.IsPositionValid() && manual_recall_location.GetMapId() != 4294967295 && manual_recall_instanceId != -1;
+        }
 
         void SetHomebind(WorldLocation const& loc, uint32 areaId);
         void SendBindPointUpdate() const;
@@ -2808,6 +2865,8 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         bool IsReagentBankUnlocked() const { return HasPlayerFlagEx(PLAYER_FLAGS_EX_REAGENT_BANK_UNLOCKED); }
         void UnlockReagentBank() { SetPlayerFlagEx(PLAYER_FLAGS_EX_REAGENT_BANK_UNLOCKED); }
 
+        void SendRuneforgeLegendaryCraftingOpenNpc(ObjectGuid const& guid, bool isUpgrade) const;
+
         void CreateGarrison(uint32 garrSiteId);
         void DeleteGarrison();
         Garrison* GetGarrison() const { return _garrison.get(); }
@@ -2833,6 +2892,9 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
                 .ModifyValue(&UF::RestInfo::Threshold), threshold);
         }
 
+        uint32 GetLastTargetedGO() { return _lastTargetedGO; }
+        void SetLastTargetedGO(uint32 lastTargetedGO) { _lastTargetedGO = lastTargetedGO; }
+
         void SendPlayerChoice(ObjectGuid sender, int32 choiceId);
 
         bool MeetPlayerCondition(uint32 conditionId) const;
@@ -2849,18 +2911,11 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
 
         void SetAverageItemLevel(float newItemLevel, AvgItemLevelCategory category) { SetUpdateFieldValue(m_values.ModifyValue(&Player::m_playerData).ModifyValue(&UF::PlayerData::AvgItemLevel, uint32(category)), newItemLevel); }
 
-        uint32 GetCustomizationChoice(uint32 chrCustomizationOptionId) const
-        {
-            int32 choiceIndex = m_playerData->Customizations.FindIndexIf([chrCustomizationOptionId](UF::ChrCustomizationChoice choice)
-            {
-                return choice.ChrCustomizationOptionID == chrCustomizationOptionId;
-            });
-
-            if (choiceIndex >= 0)
-                return m_playerData->Customizations[choiceIndex].ChrCustomizationChoiceID;
-
-            return 0;
-        }
+        uint32 GetCustomizationChoice(uint32 chrCustomizationOptionId) const;
+        void ClearPreviousCustomizations(std::vector<ChrCustomizationOptionEntry const*> const* oldCustomizations);
+        void ClearPreviousModelCustomizations(const uint32 oldModel);
+        void ClearPreviousRaceGenderCustomizations(const uint8 race, const uint8 gender);
+        void SetMissingCustomizations();
 
         template<typename Iter>
         void SetCustomizations(Trinity::IteratorPair<Iter> customizations, bool markChanged = true)
@@ -2868,7 +2923,6 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
             if (markChanged)
                 m_customizationsChanged = true;
 
-            ClearDynamicUpdateFieldValues(m_values.ModifyValue(&Player::m_playerData).ModifyValue(&UF::PlayerData::Customizations));
             for (auto&& customization : customizations)
             {
                 UF::ChrCustomizationChoice& newChoice = AddDynamicUpdateFieldValue(m_values.ModifyValue(&Player::m_playerData).ModifyValue(&UF::PlayerData::Customizations));
@@ -3228,6 +3282,11 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         // Recall position
         TeleportLocation m_recall_location;
 
+        // Reusable recall location in spells.
+        // m_recall_location gets reset all the time from teleporting, so can't reliably use this in spells
+        WorldLocation manual_recall_location;
+        uint32 manual_recall_instanceId = -1;
+
         std::unique_ptr<Runes> m_runes;
         EquipmentSetContainer _equipmentSets;
 
@@ -3306,6 +3365,10 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
 
         uint32 _activeCheats;
 
+        bool overrideScreenFlash;
+
+        uint32 _lastTargetedGO;
+
         std::unique_ptr<Garrison> _garrison;
 
         bool _advancedCombatLoggingEnabled;
@@ -3327,6 +3390,21 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         bool _usePvpItemLevels;
         ObjectGuid _areaSpiritHealerGUID;
 
+        bool _justPassedBarberChecks;
+
+    public:
+        struct WargameRequest
+        {
+            ObjectGuid OpposingPartyMemberGUID;
+            uint64 QueueID;
+            time_t CreationDate;
+            bool TournamentRules;
+        };
+
+        bool HasWargameRequest() const { return _wargameRequest != nullptr; }
+        WargameRequest* GetWargameRequest() const { return _wargameRequest; }
+        WargameRequest* _wargameRequest;
+
         // Spell cast request handling
     public:
         // Queues up a spell cast request that has been received via packet and processes it whenever possible.
@@ -3334,11 +3412,17 @@ class TC_GAME_API Player final : public Unit, public GridObject<Player>
         void CancelPendingCastRequest();
         bool CanRequestSpellCast(SpellInfo const* spell, Unit const* castingUnit) const;
 
+        bool HasQuest(uint32 questID) const;
+        bool TeleportToDigsiteInMap(uint32 mapId);
+
     private:
         std::unique_ptr<SpellCastRequest> _pendingSpellCastRequest;
         void ExecutePendingSpellCastRequest();
         bool ProcessItemCast(SpellCastRequest& castRequest, SpellCastTargets const& targets);
         bool CanExecutePendingSpellCastRequest();
+
+    public:
+        inline static std::function<void(Player*, Unit*)> OnMeetUnit;
 };
 
 TC_GAME_API void AddItemsSetItem(Player* player, Item const* item);

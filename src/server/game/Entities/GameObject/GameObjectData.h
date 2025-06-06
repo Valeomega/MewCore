@@ -1342,6 +1342,26 @@ struct GameObjectTemplate
         }
     }
 
+    uint32 GetSpawnMap() const
+    {
+        switch (type)
+        {
+        case GAMEOBJECT_TYPE_TRANSPORT:
+            return transport.SpawnMap;
+        case GAMEOBJECT_TYPE_MAP_OBJ_TRANSPORT:
+            return moTransport.SpawnMap;
+        case GAMEOBJECT_TYPE_GARRISON_BUILDING:
+            return garrisonBuilding.SpawnMap;
+        case GAMEOBJECT_TYPE_GARRISON_PLOT:
+            return garrisonPlot.SpawnMap;
+        case GAMEOBJECT_TYPE_PHASEABLE_MO:
+            return phaseableMO.SpawnMap;
+        default:
+            break;
+        }
+        return 0;
+    }
+
     bool IsDisplayMandatory() const
     {
         switch (type)
@@ -1401,6 +1421,8 @@ struct GameObjectData : public SpawnData
     uint32 animprogress = 0;
     GOState goState = GO_STATE_ACTIVE;
     uint32 artKit = 0;
+	float size = 0.0f;
+    float visibility = 533.3333f;
 };
 
 enum class GameObjectActions : uint32

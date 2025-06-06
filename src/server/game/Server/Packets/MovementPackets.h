@@ -25,8 +25,6 @@
 
 namespace Movement
 {
-    template<class index_type>
-    class Spline;
     class MoveSpline;
 }
 
@@ -148,7 +146,6 @@ namespace WorldPackets
         {
         public:
             static void WriteCreateObjectSplineDataBlock(::Movement::MoveSpline const& moveSpline, ByteBuffer& data);
-            static void WriteCreateObjectAreaTriggerSpline(::Movement::Spline<int32> const& spline, ByteBuffer& data);
 
             static void WriteMovementForceWithDirection(MovementForce const& movementForce, ByteBuffer& data, Position const* objectPosition = nullptr);
         };
@@ -584,6 +581,16 @@ namespace WorldPackets
             float Height = 1.0f;
         };
 
+        class DiscardedTimeSyncAcks final : public ClientPacket
+        {
+        public:
+            DiscardedTimeSyncAcks(WorldPacket&& packet) : ClientPacket(CMSG_DISCARDED_TIME_SYNC_ACKS, std::move(packet)) {}
+
+            void Read() override;
+
+            uint32 MaxSequenceIndex = 0;
+        };
+
         class MoveTimeSkipped final : public ClientPacket
         {
         public:
@@ -748,6 +755,18 @@ namespace WorldPackets
             void Read() override;
 
             uint32 Ticks = 0;
+        };
+
+        class MoveAddImpulse final : public ServerPacket
+        {
+        public:
+            explicit MoveAddImpulse() : ServerPacket(SMSG_MOVE_ADD_IMPULSE, 4 + 4) { }
+
+            WorldPacket const* Write() override;
+
+            ObjectGuid MoverGUID;
+            uint32 SequenceIndex = 1;
+            TaggedPosition<Position::XYZ> Direction;
         };
 
         ByteBuffer& operator>>(ByteBuffer& data, MovementAck& ack);

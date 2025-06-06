@@ -43,6 +43,9 @@
 #include <map>
 #include <unordered_map>
 
+#include <memory>
+class CreatureOutfit;
+
 class Item;
 class Unit;
 class Vehicle;
@@ -865,6 +868,18 @@ struct SceneTemplate
     uint32 ScriptId = 0;
 };
 
+struct ItemScrappingLoot
+{
+    uint32 Id;
+    uint32 Class;
+    uint32 Subclass;
+    int32 InventoryType;
+    uint32 MinLevel;
+    uint32 MaxLevel;
+    int32 Quality;
+    int32 IsCrafted;
+};
+
 typedef std::unordered_map<uint32, SceneTemplate> SceneTemplateContainer;
 
 typedef std::unordered_map<uint32, std::string> PhaseNameContainer;
@@ -1055,11 +1070,13 @@ enum QueryDataGroup
 };
 
 class PlayerDumpReader;
+class Roleplay;
 
 class TC_GAME_API ObjectMgr
 {
     friend class PlayerDumpReader;
     friend class UnitTestDataLoader;
+	friend class Roleplay;
 
     private:
         ObjectMgr();
@@ -1124,6 +1141,8 @@ class TC_GAME_API ObjectMgr
         };
 
         typedef std::map<uint32, uint32> CharacterConversionMap;
+		
+		typedef std::unordered_map<uint32, std::shared_ptr<CreatureOutfit>> CreatureOutfitContainer;
 
         DestructibleHitpoint const* GetDestructibleHitpoint(uint32 entry) const;
         GameObjectTemplate const* GetGameObjectTemplate(uint32 entry) const;
@@ -1290,6 +1309,11 @@ class TC_GAME_API ObjectMgr
         void LoadGameobjectQuestEnders();
         void LoadCreatureQuestStarters();
         void LoadCreatureQuestEnders();
+
+        std::vector<ItemScrappingLoot> _itemScrappingLootStore;
+
+        ItemScrappingLoot const* GetItemScrappingLoot(Item* item) const;
+        std::vector<ItemScrappingLoot> const* GetItemScrappingLootStore() const { return &_itemScrappingLootStore; }
 
         QuestRelations* GetGOQuestRelationMapHACK() { return &_goQuestRelations; }
         QuestRelationResult GetGOQuestRelations(uint32 entry) const { return GetQuestRelationsFrom(_goQuestRelations, entry, true); }
@@ -1647,6 +1671,11 @@ class TC_GAME_API ObjectMgr
         bool AddGameTele(GameTele& data);
         bool DeleteGameTele(std::string_view name);
 
+		const CreatureOutfitContainer& GetCreatureOutfitMap() const { return _creatureOutfitStore; }
+        std::shared_ptr<CreatureOutfit> const& GetOutfit(uint32 modelid) const;
+        uint32 GetRealDisplayId(uint32 modelid) const;
+        void LoadCreatureOutfits();
+
         Trainer::Trainer const* GetTrainer(uint32 trainerId) const;
         uint32 GetCreatureDefaultTrainer(uint32 creatureId) const
         {
@@ -1862,6 +1891,8 @@ class TC_GAME_API ObjectMgr
 
         PageTextContainer _pageTextStore;
         InstanceTemplateContainer _instanceTemplateStore;
+
+		CreatureOutfitContainer _creatureOutfitStore;
 
     public:
         PhaseInfoStruct const* GetPhaseInfo(uint32 phaseId) const;

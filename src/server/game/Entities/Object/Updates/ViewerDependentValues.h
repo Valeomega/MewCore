@@ -200,7 +200,7 @@ public:
 
             if (cinfo->flags_extra & CREATURE_FLAG_EXTRA_TRIGGER)
                 if (receiver->IsGameMaster())
-                    displayId = cinfo->GetFirstVisibleModel()->CreatureDisplayID;
+                    displayId = sObjectMgr->GetRealDisplayId(cinfo->GetFirstVisibleModel()->CreatureDisplayID);
         }
 
         return displayId;
@@ -369,6 +369,14 @@ public:
 
     static value_type GetValue(UF::UnitData const* /*unitData*/, Unit const* unit, Player const* receiver)
     {
+        auto observer = const_cast<Player*>(receiver);
+        auto observable = const_cast<Unit*>(unit);
+
+        if (observable != observer)
+        {
+            Player::OnMeetUnit(observer, observable);
+        }
+
         // Check per caster aura states to not enable using a spell in client if specified aura is not by target
         return unit->BuildAuraStateUpdateForTarget(receiver);
     }

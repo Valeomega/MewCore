@@ -50,6 +50,9 @@
 #include "RestMgr.h"
 #include "ScriptMgr.h"
 #include "Spell.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "SpellPackets.h"
 #include "WhoListStorage.h"
 #include "WhoPackets.h"
@@ -76,6 +79,11 @@ void WorldSession::HandleRepopRequest(WorldPackets::Misc::RepopRequest& /*packet
             GetPlayer()->GetName(), GetPlayer()->GetGUID().ToString());
         GetPlayer()->KillPlayer();
     }
+
+#ifdef ELUNA
+    if (Eluna* e = GetPlayer()->GetEluna())
+        e->OnRepop(GetPlayer());
+#endif
 
     //this is spirit release confirm?
     GetPlayer()->RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
@@ -395,6 +403,11 @@ void WorldSession::HandleRequestCemeteryList(WorldPackets::Misc::RequestCemetery
 
 void WorldSession::HandleSetSelectionOpcode(WorldPackets::Misc::SetSelection& packet)
 {
+#ifndef DISABLE_DRESSNPCS_CORESOUNDS
+    if (packet.Selection.IsAnyTypeCreature())
+        if (Creature* creature = _player->GetMap()->GetCreature(packet.Selection))
+            creature->SendMirrorSound(_player, 0);
+#endif
     _player->SetSelection(packet.Selection);
 }
 
@@ -1156,6 +1169,12 @@ void WorldSession::HandleMountSetFavorite(WorldPackets::Misc::MountSetFavorite& 
 
 void WorldSession::HandleCloseInteraction(WorldPackets::Misc::CloseInteraction& closeInteraction)
 {
+#ifndef DISABLE_DRESSNPCS_CORESOUNDS
+    if (closeInteraction.SourceGuid.IsAnyTypeCreature())
+        if (Creature* creature = _player->GetMap()->GetCreature(closeInteraction.SourceGuid))
+            creature->SendMirrorSound(_player, 1);
+#endif
+	
     if (_player->PlayerTalkClass->GetInteractionData().IsLaunchedByQuest)
         _player->PlayerTalkClass->GetInteractionData().IsLaunchedByQuest = false;
     else if (_player->PlayerTalkClass->GetInteractionData().SourceGuid == closeInteraction.SourceGuid)
@@ -1203,4 +1222,70 @@ void WorldSession::HandleQueryCountdownTimer(WorldPackets::Misc::QueryCountdownT
     startTimer.TotalTime = info->GetTotalTime();
 
     _player->SendDirectMessage(startTimer.Write());
+}
+
+void WorldSession::HandleOverrideScreenFlash(WorldPackets::Misc::OverrideScreenFlash& overrideScreenFlash)
+{
+    _player->SetOverrideScreenFlash(overrideScreenFlash.BlackScreenOrRedScreen);
+}
+
+void WorldSession::HandleAccountNotificationAcknowledge(WorldPackets::Misc::AccountNotificationAcknowledge& packet)
+{
+}
+
+void WorldSession::HandleShowTradeSkill(WorldPackets::Misc::ShowTradeSkill& packet)
+{
+    if (!sSkillLineStore.LookupEntry(packet.SkillLineID) || !sSpellMgr->GetSpellInfo(packet.SpellID, DIFFICULTY_NONE))
+        return;
+
+    Player* player = ObjectAccessor::FindPlayer(packet.PlayerGUID);
+    if (!player)
+        return;
+
+    std::set<uint32> relatedSkills;
+    relatedSkills.insert(packet.SkillLineID);
+
+    for (SkillLineEntry const* skillLine : sSkillLineStore)
+    {
+        if (skillLine->ParentSkillLineID != packet.SkillLineID)
+            continue;
+
+        if (!player->HasSkill(skillLine->ParentSkillLineID))
+            continue;
+
+        relatedSkills.insert(skillLine->ParentSkillLineID);
+    }
+
+    std::set<uint32> profSpells;
+    for (auto const& v : player->GetSpellMap())
+    {
+        if (v.second.state == PLAYERSPELL_REMOVED)
+            continue;
+
+        if (!v.second.active || v.second.disabled)
+            continue;
+
+        for (auto const& s : relatedSkills)
+            if (IsPartOfSkillLine(s, v.first))
+                profSpells.insert(v.first);
+    }
+
+    if (profSpells.empty())
+        return;
+
+    WorldPackets::Misc::ShowTradeSkillResponse response;
+    response.PlayerGUID = packet.PlayerGUID;
+    response.SpellId = packet.SpellID;
+
+    for (uint32 const& x : profSpells)
+        response.KnownAbilitySpellIDs.push_back(x);
+
+    for (uint32 const& v : relatedSkills)
+    {
+        response.SkillLineIDs.push_back(v);
+        response.SkillRanks.push_back(player->GetSkillValue(v));
+        response.SkillMaxRanks.push_back(player->GetMaxSkillValue(v));
+    }
+
+    _player->SendDirectMessage(response.Write());
 }

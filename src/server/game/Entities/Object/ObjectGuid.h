@@ -20,13 +20,13 @@
 
 #include "Define.h"
 #include "EnumFlag.h"
+#include "StringFormatFwd.h"
 #include "advstd.h"
 #include <array>
 #include <functional>
 #include <list>
 #include <set>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_set>
@@ -341,6 +341,30 @@ class TC_GAME_API ObjectGuid
         bool IsConversation()      const { return GetHigh() == HighGuid::Conversation; }
         bool IsCast()              const { return GetHigh() == HighGuid::Cast; }
 
+// Need for ELUNA
+        static TypeID GetTypeId(HighGuid high)
+        {
+            switch (high)
+            {
+            case HighGuid::Item:         return TYPEID_ITEM;
+                //case HighGuid::Container:    return TYPEID_CONTAINER; HighGuid::Container == HighGuid::Item currently
+            case HighGuid::Creature:         return TYPEID_UNIT;
+            case HighGuid::Pet:          return TYPEID_UNIT;
+            case HighGuid::Player:       return TYPEID_PLAYER;
+            case HighGuid::GameObject:   return TYPEID_GAMEOBJECT;
+            case HighGuid::DynamicObject: return TYPEID_DYNAMICOBJECT;
+            case HighGuid::Corpse:       return TYPEID_CORPSE;
+            case HighGuid::Transport: return TYPEID_GAMEOBJECT;
+            case HighGuid::Vehicle:      return TYPEID_UNIT;
+                // unknown
+            case HighGuid::Party:
+            default:                    return TYPEID_OBJECT;
+            }
+        }
+
+        TypeID GetTypeId() const { return GetTypeId(GetHigh()); }
+// Need for ELUNA
+
         bool operator!() const { return IsEmpty(); }
         bool operator==(ObjectGuid const& right) const = default;
         std::strong_ordering operator<=>(ObjectGuid const& right) const
@@ -406,34 +430,12 @@ struct std::hash<ObjectGuid>
     }
 };
 
-namespace fmt
-{
-inline namespace v10
-{
-template <typename T, typename Char, typename Enable>
-struct formatter;
-
 template <>
-struct formatter<ObjectGuid, char, void>
+struct fmt::formatter<ObjectGuid, char, void> : Trinity::NoArgFormatterBase
 {
-    template <typename ParseContext>
-    constexpr auto parse(ParseContext& ctx) -> decltype(ctx.begin())
-    {
-        auto begin = ctx.begin(), end = ctx.end();
-        if (begin == end)
-            return begin;
-
-        if (*begin != '}')
-            throw std::invalid_argument("invalid type specifier");
-
-        return begin;
-    }
-
     template <typename FormatContext>
     auto format(ObjectGuid const& guid, FormatContext& ctx) const -> decltype(ctx.out());
 };
-}
-}
 
 namespace Trinity
 {

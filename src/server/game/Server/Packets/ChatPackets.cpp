@@ -86,6 +86,11 @@ void ChatAddonMessage::Read()
     _worldPacket >> Params;
 }
 
+void CommentatorModeEnable::Read()
+{
+	_worldPacket >> Bits<3>(Action);
+}
+
 void ChatAddonMessageTargeted::Read()
 {
     _worldPacket >> Params;

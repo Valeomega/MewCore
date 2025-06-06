@@ -202,4 +202,18 @@ if(BUILD_SHARED_LIBS)
   WarnAboutSpacesInBuildPath()
 endif()
 
+if (DISABLE_DRESSNPCS_CORESOUNDS)
+  message("")
+  message("DressNPCs sound workaround disabled. Live without sounds or use a client side patch.")
+  add_definitions(-DDISABLE_DRESSNPCS_CORESOUNDS)
+endif()
+
+if (ELUNA)
+	message("* Build Eluna Lua Engine : Yes (default)")
+	add_definitions(-DELUNA)
+	add_definitions(-DTRINITY)
+else()
+	message("* Build Eluna Lua Engine : No")
+endif()
+
 message("")

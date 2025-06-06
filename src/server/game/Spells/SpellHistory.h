@@ -233,6 +233,14 @@ private:
 
     template<class T>
     struct PersistenceHelper { };
+
+    public:
+        void ForceSendSetSpellCharges(SpellCategoryEntry const* chargeCategoryEntry);
+        void ForceSendSpellCharges();
+        void ForceSendSpellCharge(SpellCategoryEntry const* chargeCategoryEntry);
+        void ReduceChargeCooldown(uint32 chargeCategoryId, uint32 reductionTime);
+        void ReduceChargeCooldown(SpellCategoryEntry const* chargeCategoryEntry, uint32 reductionTime);
+        void UpdateCharge(SpellCategoryEntry const* chargeCategoryEntry);
 };
 
 #endif // TRINITYCORE_SPELL_HISTORY_H

@@ -16,8 +16,11 @@
  */
 
 #include "WorldSession.h"
+#include "AreaTrigger.h"
+#include "AreaTriggerPackets.h"
 #include "CollectionMgr.h"
 #include "Common.h"
+#include "CreatureOutfit.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
 #include "GameObject.h"
@@ -37,6 +40,9 @@
 #include "ScriptMgr.h"
 #include "Spell.h"
 #include "SpellAuraEffects.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "SpellCastRequest.h"
 #include "SpellMgr.h"
 #include "SpellPackets.h"
@@ -219,6 +225,12 @@ void WorldSession::HandleGameobjectReportUse(WorldPackets::GameObject::GameObjRe
 
     if (GameObject* go = GetPlayer()->GetGameObjectIfCanInteractWith(packet.Guid))
     {
+#ifdef ELUNA
+        if (Eluna* e = GetPlayer()->GetEluna())
+            if (e->OnGameObjectUse(_player, go))
+                return;
+#endif
+
         if (go->AI()->OnReportUse(_player))
             return;
 
@@ -236,27 +248,11 @@ void WorldSession::HandleCastSpellOpcode(WorldPackets::Spells::CastSpell& cast)
         return;
     }
 
-    // ignore for remote control state (for player case)
-    Unit* mover = _player->GetUnitBeingMoved();
-    if (mover != _player && mover->GetTypeId() == TYPEID_PLAYER)
-        return;
-
-    Unit* castingUnit = mover;
-    if (castingUnit->IsCreature() && !castingUnit->ToCreature()->HasSpell(spellInfo->Id))
-    {
-        // If the vehicle creature does not have the spell but it allows the passenger to cast own spells
-        // change caster to player and let him cast
-        if (!_player->IsOnVehicle(castingUnit) || spellInfo->CheckVehicle(_player) != SPELL_CAST_OK)
-            return;
-
-        castingUnit = _player;
-    }
-
     if (cast.Cast.MoveUpdate.has_value())
         HandleMovementOpcode(CMSG_MOVE_STOP, *cast.Cast.MoveUpdate);
 
-    if (_player->CanRequestSpellCast(spellInfo, castingUnit))
-        _player->RequestSpellCast(std::make_unique<SpellCastRequest>(std::move(cast.Cast), castingUnit->GetGUID()));
+    if (_player->CanRequestSpellCast(spellInfo, _player))
+        _player->RequestSpellCast(std::make_unique<SpellCastRequest>(std::move(cast.Cast), _player->GetGUID()));
     else
         Spell::SendCastResult(_player, spellInfo, {}, cast.Cast.CastID, SPELL_FAILED_SPELL_IN_PROGRESS);
 }
@@ -487,6 +483,38 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPackets::Spells::GetMirrorI
     if (!unit)
         return;
 
+    if (Creature* creature = unit->ToCreature())
+    {
+        if (std::shared_ptr<CreatureOutfit> const& outfit_ptr = creature->GetOutfit())
+        {
+            CreatureOutfit const& outfit = *outfit_ptr;
+            WorldPackets::Spells::MirrorImageComponentedData mirrorImageComponentedData;
+            mirrorImageComponentedData.UnitGUID = guid;
+            if (ChrModelEntry const* chrsModel = sDB2Manager.GetChrModel(outfit.GetRace(), outfit.GetGender()))
+                mirrorImageComponentedData.ChrModelID = chrsModel->ID;
+            //mirrorImageComponentedData.ChrModelID = outfit.GetDisplayId(); // Possible crash
+            mirrorImageComponentedData.RaceID = outfit.GetRace();
+            mirrorImageComponentedData.Gender = outfit.GetGender();
+            mirrorImageComponentedData.ClassID = outfit.GetClass();
+            mirrorImageComponentedData.SpellVisualKitID = outfit.SpellVisualKitID;
+            mirrorImageComponentedData.Customizations = outfit.GetCustomizations();
+
+            mirrorImageComponentedData.GuildGUID = ObjectGuid::Empty;
+            if (outfit.guild)
+            {
+                if (Guild* guild = sGuildMgr->GetGuildById(outfit.guild))
+                    mirrorImageComponentedData.GuildGUID = guild->GetGUID();
+            }
+
+            mirrorImageComponentedData.ItemDisplayID.reserve(11);
+            for (auto const& slot : CreatureOutfit::item_slots)
+                mirrorImageComponentedData.ItemDisplayID.push_back(outfit.outfitdisplays[slot]);
+
+            SendPacket(mirrorImageComponentedData.Write());
+            return;
+        }
+    }
+
     if (!unit->HasAuraType(SPELL_AURA_CLONE_CASTER))
         return;
 
@@ -605,6 +633,22 @@ void WorldSession::HandleUpdateAuraVisual(WorldPackets::Spells::UpdateAuraVisual
 
     if (_player->GetChannelSpellId() == spellInfo->Id)
         _player->SetChannelVisual({ .SpellXSpellVisualID = spellXspellVisualId });
+}
+
+void WorldSession::HandleUpdateAreaTriggerVisual(WorldPackets::AreaTrigger::UpdateAreaTriggerVisual const& updateAreaTriggerVisual)
+{
+    AreaTrigger* target = ObjectAccessor::GetAreaTrigger(*_player, updateAreaTriggerVisual.TargetGUID);
+    if (!target)
+        return;
+
+    if (target->GetCasterGuid() != _player->GetGUID())
+        return;
+
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(target->m_areaTriggerData->SpellForVisuals, _player->GetMap()->GetDifficultyID());
+    if (!spellInfo)
+        return;
+
+    target->SetSpellVisual({ .SpellXSpellVisualID = _player->GetCastSpellXSpellVisualId(spellInfo) });
 }
 
 void WorldSession::HandleKeyboundOverride(WorldPackets::Spells::KeyboundOverride& keyboundOverride)

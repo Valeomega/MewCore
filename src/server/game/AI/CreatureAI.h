@@ -239,6 +239,8 @@ class TC_GAME_API CreatureAI : public UnitAI
         static bool IsInBounds(CreatureBoundary const& boundary, Position const* who);
         bool IsInBoundary(Position const* who = nullptr) const;
 
+        virtual void OnSuccessfulSpellCast(SpellInfo const* /*spell*/) { }
+
     protected:
         void EngagementStart(Unit* who);
         void EngagementOver();
@@ -255,6 +257,10 @@ class TC_GAME_API CreatureAI : public UnitAI
         uint32 const _scriptId;
         bool _isEngaged;
         bool _moveInLOSLocked;
+
+    public:
+        void ZoneTalk(uint8 id, WorldObject const* whisperTarget);
+        void Speak(uint32 TextID, uint32 SoundID, Player* TargetedPlayer);
 };
 
 #endif
