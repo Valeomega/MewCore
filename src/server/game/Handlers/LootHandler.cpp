@@ -38,6 +38,10 @@
 #include "SpellMgr.h"
 #include "World.h"
 
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
+
 class AELootCreatureCheck
 {
 public:
@@ -195,6 +199,10 @@ void WorldSession::HandleLootMoneyOpcode(WorldPackets::Loot::LootMoney& /*packet
             SendPacket(packet.Write());
         }
 
+#ifdef ELUNA
+        if (Eluna* e = player->GetEluna())
+            e->OnLootMoney(player, loot->gold);
+#endif
         loot->LootMoney();
 
         // Delete the money loot record from the DB
@@ -469,10 +477,18 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPackets::Loot::MasterLootItem
         }
 
         // now move item from loot to target inventory
-        if (Item* newitem = target->StoreNewItem(dest, item.itemid, true, item.randomBonusListId, item.GetAllowedLooters(), item.context, &item.BonusListIDs))
+        Item* newitem = target->StoreNewItem(dest, item.itemid, true, item.randomBonusListId, item.GetAllowedLooters(), item.context, &item.BonusListIDs);
+        if (newitem)
             aeResult.Add(newitem, item.count, loot->loot_type, loot->GetDungeonEncounterId());
         else
             target->ApplyItemLootedSpell(sObjectMgr->GetItemTemplate(item.itemid));
+
+#ifdef ELUNA
+        if (Eluna* e = target->GetEluna())
+        {
+            e->OnLootItem(target, newitem, item.count, req.Object);
+        }
+#endif
 
         // mark as looted
         item.count = 0;

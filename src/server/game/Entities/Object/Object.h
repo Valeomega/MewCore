@@ -35,12 +35,22 @@
 #include "UniqueTrackablePtr.h"
 #include <list>
 
+#ifdef ELUNA
+#include "ElunaEventMgr.h"
+#include "LuaValue.h"
+#endif
+
 class AreaTrigger;
 class Conversation;
 class Corpse;
 class Creature;
 class CreatureAI;
 class DynamicObject;
+#ifdef ELUNA
+class ElunaEventProcessor;
+class ElunaEventProcessorInfo;
+class Eluna;
+#endif
 class GameObject;
 class InstanceScript;
 class Item;
@@ -532,6 +542,17 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         bool IsStoredInWorldObjectGridContainer() const;
 
         uint32  LastUsedScriptID;
+
+#ifdef ELUNA
+        std::unique_ptr<ElunaProcessorInfo> elunaMapEvents;
+        std::unique_ptr<ElunaProcessorInfo> elunaWorldEvents;
+
+        Eluna* GetEluna() const;
+
+        ElunaEventProcessor* GetElunaEvents(int32 mapId);
+
+        LuaVal lua_data = LuaVal({});
+#endif
 
         // Transports
         TransportBase* GetTransport() const { return m_transport; }

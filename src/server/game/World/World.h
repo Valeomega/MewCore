@@ -30,6 +30,9 @@
 #include "Optional.h"
 #include "SharedDefines.h"
 #include "Timer.h"
+#ifdef ELUNA
+#include "ElunaMgr.h"
+#endif
 
 #include <atomic>
 #include <list>
@@ -39,6 +42,9 @@
 #include <variant>
 #include <vector>
 
+#ifdef ELUNA
+class Eluna;
+#endif
 class Player;
 class WorldPacket;
 class WorldSession;
@@ -791,6 +797,10 @@ class TC_GAME_API World
             return _gameRules;
         }
 
+#ifdef ELUNA
+        Eluna* GetEluna() const { return sElunaMgr->Get(_elunaInfo); }
+#endif
+
     protected:
         void _UpdateGameTime();
 
@@ -908,6 +918,9 @@ class TC_GAME_API World
         // War mode balancing
         void UpdateWarModeRewardValues();
 
+#ifdef ELUNA
+        ElunaInfo _elunaInfo;
+#endif
     friend class debug_commandscript;
 };
 
