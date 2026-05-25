@@ -37,6 +37,9 @@
 
 #include <boost/dynamic_bitset.hpp>
 #include <numeric>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 
 MapManager::MapManager()
     : _freeInstanceIds(std::make_unique<InstanceIds>()), _nextInstanceId(0), _scheduledScripts(0)
@@ -137,6 +140,11 @@ BattlegroundMap* MapManager::CreateBattleground(uint32 mapId, uint32 instanceId,
 
     if (sWorld->getBoolConfig(CONFIG_BATTLEGROUNDMAP_LOAD_GRIDS))
         map->LoadAllCells();
+
+#ifdef ELUNA
+    if (Eluna* e = map->GetEluna())
+        e->OnBGCreate(bg, bg->GetTypeID(), bg->GetInstanceID());
+#endif
 
     return map;
 }
@@ -473,6 +481,17 @@ void MapManager::FreeInstanceId(uint32 instanceId)
     // If freed instance id is lower than the next id available for new instances, use the freed one instead
     _nextInstanceId = std::min(instanceId, _nextInstanceId);
     _freeInstanceIds->set(instanceId, true);
+	
+#ifdef ELUNA
+    for (MapMapType::iterator itr = i_maps.begin(); itr != i_maps.end(); ++itr)
+    {
+        if (!(*itr).second->Instanceable())
+            continue;
+
+        if (Eluna* e = sWorld->GetEluna())
+            e->FreeInstanceId(instanceId);
+    }
+#endif
 }
 
 // hack to allow conditions to access what faction owns the map (these worldstates should not be set on these maps)

@@ -50,6 +50,9 @@
 #include "Weather.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include <G3D/g3dmath.h>
 #include <numeric>
 
@@ -737,7 +740,7 @@ AuraEffect::AuraEffect(Aura* base, SpellEffectInfo const& spellEfffectInfo, Spel
 m_base(base), m_spellInfo(base->GetSpellInfo()), m_effectInfo(spellEfffectInfo), m_spellmod(nullptr),
 m_baseAmount(baseAmount ? *baseAmount : spellEfffectInfo.CalcBaseValue(caster, base->GetType() == UNIT_AURA_TYPE ? base->GetOwner()->ToUnit() : nullptr, base->GetCastItemId(), base->GetCastItemLevel())),
 _amount(), _periodicTimer(0), _period(0), _ticksDone(0),
-m_canBeRecalculated(true), m_isPeriodic(false)
+m_canBeRecalculated(true), m_isPeriodic(false), m_scriptRef(this, NoopAuraEffectDeleter())
 {
     CalculatePeriodic(caster, true, false);
 
@@ -748,6 +751,7 @@ m_canBeRecalculated(true), m_isPeriodic(false)
 
 AuraEffect::~AuraEffect()
 {
+    m_scriptRef = nullptr;
     delete m_spellmod;
 }
 
@@ -5608,6 +5612,12 @@ void AuraEffect::HandlePeriodicTriggerSpellAuraTick(Unit* target, Unit* caster) 
     {
         if (Unit* triggerCaster = triggeredSpellInfo->NeedsToBeTriggeredByCaster(m_spellInfo) ? caster : target)
         {
+#ifdef ELUNA
+            Creature* c = target->ToCreature();
+            if (c && caster)
+                if (Eluna* e = caster->GetEluna())
+                    e->OnDummyEffect(triggerCaster, GetId(), SpellEffIndex(GetEffIndex()), c);
+#endif
             triggerCaster->CastSpell(target, triggerSpellId, CastSpellExtraArgsInit{
                 .TriggerFlags = TRIGGERED_FULL_MASK & ~(TRIGGERED_IGNORE_POWER_COST | TRIGGERED_IGNORE_REAGENT_COST),
                 .TriggeringAura = this

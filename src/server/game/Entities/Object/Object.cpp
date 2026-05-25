@@ -50,6 +50,10 @@
 #include "World.h"
 #include <G3D/Vector3.h>
 #include <sstream>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#include "ElunaConfig.h"
+#endif
 
 constexpr float VisibilityDistances[AsUnderlyingType(VisibilityDistanceType::Max)] =
 {
@@ -1155,6 +1159,11 @@ void WorldObject::SetMap(Map* map)
     m_currMap = map;
     m_mapId = map->GetId();
     m_InstanceId = map->GetInstanceId();
+#ifdef ELUNA
+    // Reset MAP processor
+    if (elunaMapEvents)
+        elunaMapEvents.reset();
+#endif
     if (IsStoredInWorldObjectGridContainer())
         m_currMap->AddWorldObject(this);
 }
@@ -3141,6 +3150,39 @@ std::string WorldObject::GetDebugInfo() const
          << "Name: " << GetName();
     return sstr.str();
 }
+
+#ifdef ELUNA
+Eluna* WorldObject::GetEluna() const
+{
+    if (const Map* map = FindMap())
+        return map->GetEluna();
+
+    return nullptr;
+}
+
+ElunaEventProcessor* WorldObject::GetElunaEvents(int32 mapId)
+{
+    Eluna* eluna = mapId == -1 ? sWorld->GetEluna() : GetEluna();
+    if (!eluna)
+        return nullptr;
+
+    EventMgr* mgr = eluna->eventMgr.get();
+    if (!mgr)
+        return nullptr;
+
+    // Select the correct ProcessorInfo slot
+    std::unique_ptr<ElunaProcessorInfo>& info = (mapId == -1) ? elunaWorldEvents : elunaMapEvents;
+
+    // Lazily create processor + ProcessorInfo handle
+    if (!info)
+    {
+        uint64 id = mgr->CreateObjectProcessor(this);
+        info = std::make_unique<ElunaProcessorInfo>(mgr, id);
+    }
+
+    return mgr->GetObjectProcessor(info->GetProcessorId());
+}
+#endif
 
 template TC_GAME_API void WorldObject::GetGameObjectListWithEntryInGrid(std::list<GameObject*>&, uint32, float) const;
 template TC_GAME_API void WorldObject::GetGameObjectListWithEntryInGrid(std::deque<GameObject*>&, uint32, float) const;

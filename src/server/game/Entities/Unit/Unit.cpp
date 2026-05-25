@@ -94,6 +94,10 @@
 #include <queue>
 #include <sstream>
 #include <cmath>
+#ifdef ELUNA
+#include "LuaEngine.h"
+#include "ElunaEventMgr.h"
+#endif
 
 float baseMoveSpeed[MAX_MOVE_TYPE] =
 {
